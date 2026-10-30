@@ -1,6 +1,6 @@
 // Trainingsplan-Logik: Phasen, Wochenberechnung, Statistiken. Reine Funktionen ohne DOM.
 import { addDays, daysBetween, todayISO, clamp, uid, mondayOf, average, isISODate, dayNumber } from './util.js';
-import { EXERCISES, WORKOUTS } from './exercises.js';
+import { EXERCISES, WORKOUTS, exerciseDef, isCustomId, isSelectable } from './exercises.js';
 import { TIPS, PAUSE_CLEARANCE_NOTE } from './content.js';
 
 export const TOTAL_WEEKS = 12;
@@ -197,8 +197,9 @@ export function latestSession(sessions, pred = isCompleted) {
   return best;
 }
 
+/** A und B wechseln sich ab. Freie Einheiten (F) zählen als Training, ändern aber nicht die Reihenfolge. */
 export function nextWorkoutType(sessions) {
-  const last = latestSession(sessions);
+  const last = latestSession(sessions, (s) => isCompleted(s) && (s.type === 'A' || s.type === 'B'));
   return last ? (last.type === 'A' ? 'B' : 'A') : 'A';
 }
 
@@ -383,9 +384,55 @@ export function buildSets(exId, phase, sessions) {
   }));
 }
 
-export function createSession({ type, planWeek, date, startTime, state, status = 'draft' }) {
+/**
+ * Sätze für das freie Training: Anzahl wie gewählt (sonst wie zuletzt bzw. laut Phase),
+ * Gewicht und Wiederholungen wie beim letzten Mal. Alle Sätze sind Pflichtsätze.
+ */
+export function buildFreeSets(exId, phase, sessions, count = null) {
+  const last = lastPerformance(sessions, exId);
+  const n = clamp(Math.round(Number(count) || (last ? last.sets.length : phase.setsMax)), 1, 6);
+  const weight = last ? last.weight : null;
+  const reps = last && last.reps != null ? last.reps : phase.repsMax;
+  return Array.from({ length: n }, () => ({ weight, reps, rpe: null, done: false, optional: false }));
+}
+
+/** Übung für eine freie Einheit (oder zum Nachtragen) anlegen. */
+export function freeExercise(id, phase, sessions, count = null) {
+  const ex = { id, done: false, skipped: false, optional: false, notes: '', sets: buildFreeSets(id, phase, sessions, count) };
+  if (isCustomId(id)) ex.name = exerciseDef(id).name;
+  return ex;
+}
+
+/** Übungen und übliche Satzzahl der letzten freien Einheit (Vorschlag für die nächste). */
+export function lastFreeSelection(sessions) {
+  const last = latestSession(sessions, (s) => s.type === 'F' && (s.status === 'completed' || s.status === 'aborted'));
+  if (!last) return { ids: [], sets: null };
+  const ids = [...new Set(last.exercises.map((e) => e.id))].filter(isSelectable);
+  const freq = new Map();
+  for (const e of last.exercises) if (e.sets.length) freq.set(e.sets.length, (freq.get(e.sets.length) || 0) + 1);
+  let sets = null;
+  let best = 0;
+  for (const [n, c] of freq) if (c > best || (c === best && n < sets)) { best = c; sets = n; }
+  return { ids, sets: sets == null ? null : clamp(sets, 1, 3) };
+}
+
+/** Vergleich einer freien Auswahl mit den Vorgaben der Planwoche (nur Hinweis, keine Sperre). */
+export function freePlanCheck(count, sets, week, plan, profile) {
+  const phase = phaseForWeek(week);
+  const planExercises = Math.max(workoutExerciseIds('A', week, plan).length, workoutExerciseIds('B', week, plan).length);
+  return {
+    over: count > planExercises || sets > phase.setsMax,
+    planExercises,
+    phase,
+    target: rpeTarget(phase, profile),
+    total: count * sets,
+  };
+}
+
+export function createSession({ type, planWeek, date, startTime, state, status = 'draft', exerciseIds = null, setCount = null }) {
   const phase = phaseForWeek(planWeek);
-  const ids = workoutExerciseIds(type, planWeek, state.plan);
+  const free = type === 'F';
+  const ids = free ? [...new Set(exerciseIds || [])].filter((id) => exerciseDef(id)) : workoutExerciseIds(type, planWeek, state.plan);
   const now = new Date().toISOString();
   return {
     id: uid(), type, planWeek, date, startTime,
@@ -393,7 +440,7 @@ export function createSession({ type, planWeek, date, startTime, state, status =
     wellbeingBefore: null, wellbeingAfter: null,
     warmupDone: false, cooldownDone: false, cardioMin: null, symptoms: false,
     precheck: false, abortReason: '', notes: '',
-    exercises: ids.map((id) => ({
+    exercises: ids.map((id) => (free ? freeExercise(id, phase, state.sessions, setCount) : {
       id, done: false, skipped: false, optional: !!EXERCISES[id].optional, notes: '',
       sets: buildSets(id, phase, state.sessions),
     })),

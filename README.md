@@ -12,10 +12,13 @@ Persönliche Fitness-App (Progressive Web App) für einen vorsichtigen Wiederein
 
 - **Heute:** aktuelle Trainingswoche (12-Segment-Ring), nächste Einheit mit Vorgaben, absolvierte Einheiten, Fortschritt in Prozent, letztes Training, Erholungs- und Motivationshinweise.
 - **Plan:** fünf Phasen mit Sätzen, Wiederholungen, Belastung (RPE), Pausen und Ausdauer; Training A und B mit Anleitungen; Woche wiederholen.
+- **Freies Training:** eine Einheit selbst zusammenstellen – aus allen Geräten und eigenen Übungen, mit 1–3 Sätzen pro Übung, Sätze und Übungen auch während des Trainings ergänzen oder entfernen. Liegt die Auswahl über den Vorgaben der Planwoche, zeigt die App einen Hinweis (keine Sperre). Freie Einheiten zählen als Trainingstag, ändern aber nicht den Wechsel von Training A und B.
+- **Weitere Geräte:** Kniebeuge-Maschine (z. B. „Legs“), Bauchmaschine, Rückenstrecker-Maschine, Bizeps- und Trizeps-Maschine – jeweils mit Zeichnung, Anleitung, Atmung und Sicherheitshinweisen.
+- **Eigene Übungen:** fehlende Geräte selbst anlegen (Name, Körperbereich, Gewicht in kg, kg je Hantel oder Stufe, Notiz), mit Foto und Einstellung am Gerät; umbenennen, ausblenden (Verlauf bleibt erhalten) oder löschen.
 - **Gerätefotos:** Zu jedem Gerät ein eigenes Foto aus deinem Studio aufnehmen oder aus der Fotomediathek wählen – es erscheint in der Übungsanleitung, im Training und im Plan. Dazu eine dauerhafte „Einstellung am Gerät“ (z. B. Sitz 4, Rückenlehne 2). Fotos werden verkleinert und nur auf dem Gerät gespeichert.
 - **Training:** Vorab-Check, Aufwärmen, optionale Ausdauer und Abwärmen mit Timer, jede Übung mit selbst gezeichneter Illustration (Geräte mit Gewichtsblock), Schritt-für-Schritt-Anleitung, Eingabe von Gewicht, Wiederholungen und RPE pro Satz, Sätze und Übungen abhaken, Notizen, Pausen-Timer, Warnzeichen-Knopf mit Notruf und Abbruch.
 - **Sicherheit im Training:** Steuerung über RPE und Sprechtest statt Puls (Betablocker), Hinweis bei zu hoher Belastung, ärztliche Obergrenzen werden berücksichtigt, Gewichte werden **nie automatisch** erhöht.
-- **Verlauf:** alle Einheiten mit Datum, Training A/B, Übungen, Gewicht, Wiederholungen, Sätzen, RPE, Dauer und Wohlbefinden; bearbeiten, löschen, nachtragen.
+- **Verlauf:** alle Einheiten mit Datum, Training A/B oder frei, Übungen, Gewicht, Wiederholungen, Sätzen, RPE, Dauer und Wohlbefinden; bearbeiten (auch Übungen ergänzen oder entfernen), löschen, nachtragen.
 - **Fortschritt:** Trainingshäufigkeit, abgeschlossene Wochen, Konstanz-Kalender, Gewichts- und Wiederholungsverlauf je Übung, Belastungsverlauf, optional Körpergewicht – ohne Prognosen.
 - **Plananpassung:** Startdatum ändern, aktuelle Woche festlegen, Woche wiederholen, verpasste Einheiten nachholen; nach längeren Pausen schlägt die App einen sicheren Wiedereinstieg vor.
 - **Datensicherung:** Export als JSON (komplette Sicherung) und CSV (Protokoll, für Excel/Numbers), Wiederherstellen aus einer Sicherung, Zurücksetzen mit Sicherheitsabfrage.
@@ -77,8 +80,9 @@ Danach GitHub Pages wie in Schritt 6 oben aktivieren.
 
 - **Einstellungen → Datensicherung → Sicherung erstellen** öffnet das Teilen-Menü des iPhones. Dort „In Dateien sichern“ wählen oder die Datei per Mail an dich selbst senden.
 - Daten können verloren gehen, wenn Websitedaten gelöscht werden oder die App vom Home-Bildschirm entfernt wird. Deshalb erinnert die App alle zwei Wochen an eine Sicherung.
-- Die Sicherung enthält auch deine Gerätefotos und Geräteeinstellungen.
+- Die Sicherung enthält auch deine Gerätefotos, Geräteeinstellungen und eigenen Übungen.
 - **Wiederherstellen:** Einstellungen → „Sicherung wiederherstellen“ (oder beim ersten Start auf dem Willkommensbildschirm) und die `.json`-Datei auswählen. „Ersetzen“ übernimmt die Sicherung vollständig, „Zusammenführen“ ergänzt nur fehlende Einheiten.
+- **Einzelne Einheiten importieren:** Dateien mit nachgetragenen Einheiten (Format 2, `"kind": "sessions"`) öffnest du ebenfalls über „Sicherung wiederherstellen“. Sie werden nur **hinzugefügt** – Profil, Plan und vorhandene Einheiten bleiben unverändert, die Planwoche richtet sich nach deinem Plan. Ältere App-Versionen lehnen solche Dateien mit dem Hinweis „bitte aktualisieren“ ab.
 - **CSV-Export** (Semikolon, Dezimalkomma) für Excel oder Numbers.
 
 ## Updates veröffentlichen
@@ -105,6 +109,7 @@ athletic-longevity/
     ├── exercises.js        Übungskatalog mit Anleitungen
     ├── illustrations.js    selbst gezeichnete SVG-Illustrationen
     ├── photos.js           eigene Gerätefotos (verkleinern, lokal speichern, anzeigen)
+    ├── views/picker.js     Übungsauswahl fürs freie Training, eigene Übungen anlegen/ausblenden
     ├── content.js          Sicherheits- und Hinweistexte
     ├── store.js            Speicherung (IndexedDB + Spiegel), Bereinigung
     ├── backup.js           JSON-/CSV-Export, Import
@@ -125,24 +130,21 @@ athletic-longevity/
 4. **Kosten:** Zum Ausprobieren reicht eine kostenlose Apple-ID; selbst installierte Apps laufen dann jeweils 7 Tage und werden danach neu aus Xcode aufgespielt. Für dauerhafte Nutzung, TestFlight oder den App Store ist das Apple-Developer-Programm nötig (in der EU 99 € pro Jahr).
 5. **Alternative:** eine komplette Neuentwicklung in Swift/SwiftUI – am nativsten, aber deutlich mehr Aufwand.
 
-## Testbericht (Version 1.1.0)
+## Testbericht (Version 1.2.0)
 
 **Automatisch getestet** (Chromium mit iPhone-Emulation, App unter dem Unterpfad ausgeliefert):
 
 | Prüfpunkt | Ergebnis |
 |---|---|
-| Navigation auf kleinen Bildschirmen (320, 375, 390, 430 px; alle Ansichten, Hell und Dunkel) | kein horizontales Scrollen, nichts abgeschnitten |
-| Daten nach Neuladen wiederhergestellt (auch mitten im Training: Gewichte, Notizen, erledigte Sätze) | bestanden |
-| Datensicherung (JSON), CSV-Export, Zurücksetzen und Wiederherstellen | bestanden |
-| Logik-Tests (Wochenwechsel, Zeitumstellung, Wiederholen, Pausen, Statistik, Import/Export, Fotos) | 80/80 bestanden |
-| Übungen, Sätze, Fortschritt und Diagramme korrekt angezeigt | bestanden |
-| Gerätefotos (19 Prüfungen: aufnehmen, Verkleinerung auf 1400 px, Neuladen, Plan, Training, gemeinsames Foto für „Brustpresse leicht“, Sicherung, Reset, Wiederherstellung, Löschen, offline) | 19/19 bestanden |
-| Update von Version 1.0.0 auf 1.1.0 mit vorhandenen Trainingsdaten | Daten erhalten, Datenbank erweitert, alter Offline-Speicher entfernt |
-| Manifest und Service Worker unter dem Unterpfad | bestanden, alle Icons erreichbar |
-| Offline-Nutzung nach dem ersten Laden (Neuladen ohne Netz, alle Tabs) | bestanden |
-| Barrierefreiheit (axe, WCAG 2 AA, alle Ansichten hell und dunkel) | keine Verstöße |
+| Logik-Tests (Wochenwechsel, Zeitumstellung, Pausen, Statistik, Import/Export, Fotos, freies Training, eigene Übungen, Teil-Import) | 116/116 bestanden |
+| Freies Training, neue Geräte, eigene Übungen (Auswahl, Planhinweis, Sätze/Übungen im Training ergänzen und entfernen, Verlauf, Bearbeiten, Nachtragen, Ausblenden, Löschen, Fortschritt, CSV, Sicherung mit Foto, 320 px) | 69/69 bestanden |
+| Import des nachgetragenen Trainings (nur Hinzufügen, keine Dublette beim zweiten Import, Profil und Fotos unverändert) | bestanden |
+| Update von Version 1.1.0 auf 1.2.0 mit Trainingsdaten und Gerätefoto | Daten, Foto und Einstellung erhalten, alter Offline-Speicher entfernt, neue Seiten offline verfügbar |
+| Version 1.1.0 erhält die neue Importdatei | wird mit „bitte aktualisieren“ abgelehnt, kein Ersetzen möglich |
+| Ende-zu-Ende-Ablauf (40), Bedienabläufe (20), Gerätefotos (19) | 79/79 bestanden |
+| Navigation auf kleinen Bildschirmen (320, 375, 390 px; Hell und Dunkel) | kein horizontales Scrollen, nichts abgeschnitten |
+| Barrierefreiheit (axe, WCAG 2 AA, alle Ansichten und alle neuen Ansichten, hell und dunkel) | keine Verstöße |
 | JavaScript-Fehler oder fehlende Dateien | keine |
-| Ende-zu-Ende-Ablauf (40 Prüfungen) und Bedienabläufe (20 Prüfungen) | 60/60 bestanden |
 
 **Noch auf einem echten iPhone zu prüfen** (in der Testumgebung nicht verfügbar):
 
@@ -150,6 +152,7 @@ athletic-longevity/
 - Offline-Start der installierten App (einmal online öffnen, dann Flugmodus)
 - Teilen-Menü beim Erstellen der Sicherung und Dateiauswahl beim Wiederherstellen
 - Kamera bzw. Fotomediathek beim Hinzufügen eines Gerätefotos
+- Dateiauswahl beim Import der Datei mit dem nachgetragenen Training (aus „Dateien“, Mail oder AirDrop)
 - Darstellung der Statusleiste, Notch/Dynamic Island und Home-Indikator
 - Schrift SF Pro Rounded, Datums- und Auswahlfelder von iOS
 - Signalton am Pausenende und „Bildschirm anlassen“ (abhängig von iOS-Version und Lautlos-Schalter)

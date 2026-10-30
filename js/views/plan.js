@@ -5,12 +5,16 @@ import {
   PHASES, TOTAL_WEEKS, weekInfo, programStats, phaseWeeksLabel, sessionsLabel, setsLabel, repsLabel, rpeTarget,
   repeatPlanned, anchorsRepeatWeek, anchorsCancelRepeat, startDateOf, lastPerformance,
 } from '../plan.js';
-import { EXERCISES, WORKOUTS } from '../exercises.js';
+import { EXERCISES, WORKOUTS, EXTRA_EXERCISES, exerciseDef, customExerciseIds } from '../exercises.js';
 import { illustration } from '../illustrations.js';
 import { SESSION_FLOW, REST_DAYS, TALK_TEST } from '../content.js';
-import { icon, pageHead, settingsButton, toast, confirmDialog } from '../ui.js';
+import { icon, pageHead, settingsButton, toast, confirmDialog, banner } from '../ui.js';
 import { openRpeSheet, exerciseDetailHTML } from './dialogs.js';
-import { startFlow } from './training.js';
+import { startFlow, prepareFree } from './training.js';
+import { navigate } from '../router.js';
+import {
+  openCustomExerciseSheet, removeCustomExercise, restoreCustomExercise, customUsage,
+} from './picker.js';
 import { lastText } from './common.js';
 import { thumbHTML, bindMachineBlocks, hydratePhotos } from '../photos.js';
 
@@ -80,6 +84,18 @@ function renderPlan() {
     </section>`;
   };
 
+  const exItem = (id, sub = '') => {
+    const def = exerciseDef(id);
+    return `<li><a class="ex-preview-item" href="#/uebung/${esc(id)}">
+      ${thumbHTML(id, illustration(id))}
+      <span class="ex-preview-text"><strong>${esc(def.name)}${def.archived ? ' <span class="tag">ausgeblendet</span>' : ''}</strong>
+        <span>${esc(sub || def.muscles || 'Eigene Übung')}</span></span>
+      ${icon('chevronRight', 'chev')}</a></li>`;
+  };
+  const customIds = customExerciseIds({ includeArchived: true });
+  const customActive = customIds.filter((id) => !exerciseDef(id).archived);
+  const customArchived = customIds.filter((id) => exerciseDef(id).archived);
+
   return `
     ${pageHead({ title: 'Plan', subtitle: '12 Wochen mit zwei Ganzkörpereinheiten im Wechsel', actions: settingsButton() })}
     ${current}
@@ -91,6 +107,24 @@ function renderPlan() {
     <h2 class="section-title">Die Trainings</h2>
     ${workout('A')}
     ${workout('B')}
+    <section class="card">
+      <div class="card-row"><h3 class="card-title">Freies Training</h3>
+        <button type="button" class="btn btn-sm btn-secondary" data-act="free">${icon('play')}Zusammenstellen</button></div>
+      <p class="body-text">Stell dir eine Einheit aus beliebigen Geräten und eigenen Übungen zusammen. Es gelten die Belastungsregeln deiner Planwoche, und die Einheit zählt zu deinen Trainingstagen.</p>
+    </section>
+    <h2 class="section-title">Weitere Geräte</h2>
+    <section class="card">
+      <p class="card-sub">Nicht Teil von Training A oder B – für dein freies Training.</p>
+      <ul class="ex-preview">${EXTRA_EXERCISES.map((id) => exItem(id)).join('')}</ul>
+    </section>
+    <h2 class="section-title">Eigene Übungen</h2>
+    <section class="card" id="eigene-uebungen">
+      ${customActive.length ? `<ul class="ex-preview">${customActive.map((id) => exItem(id)).join('')}</ul>`
+        : '<p class="body-text">Fehlt ein Gerät aus deinem Studio? Lege es als eigene Übung an – mit Foto und deiner Einstellung.</p>'}
+      <button type="button" class="btn btn-secondary" data-act="newcustom">${icon('plus')}Eigene Übung anlegen</button>
+      ${customArchived.length ? `<details class="disclosure disclosure-inline"><summary>Ausgeblendet (${customArchived.length})</summary>
+        <ul class="ex-preview">${customArchived.map((id) => exItem(id)).join('')}</ul></details>` : ''}
+    </section>
     <h2 class="section-title">Die fünf Phasen</h2>
     <p class="body-text">Gesteigert wird nur bei guter Verträglichkeit, sauberer Technik und im Rahmen deiner ärztlichen Freigabe. Die App erhöht Gewichte nie automatisch – du kannst Wochen jederzeit wiederholen.</p>
     ${phases}
@@ -102,15 +136,28 @@ function renderPlan() {
 }
 
 function renderExercise(id) {
-  const ex = EXERCISES[id];
-  if (!ex) {
+  const ex = exerciseDef(id);
+  const known = EXERCISES[id] || (ex && store.state.customExercises.some((c) => c.id === id));
+  if (!ex || !known) {
     return `${pageHead({ title: 'Übung nicht gefunden', back: { href: '#/plan', label: 'Plan' } })}`;
   }
   const last = lastPerformance(store.state.sessions, id);
+  const used = ex.custom ? customUsage(id) : 0;
   return `
-    ${pageHead({ title: ex.name, subtitle: esc(ex.muscles), back: { href: '#/plan', label: 'Plan' } })}
+    ${pageHead({
+      title: ex.name, subtitle: esc(ex.muscles || 'Eigene Übung'), back: { href: '#/plan', label: 'Plan' },
+      actions: ex.custom ? `<button type="button" class="icon-btn icon-btn-lg" data-act="editcustom" aria-label="Übung bearbeiten">${icon('edit')}</button>` : '',
+    })}
+    ${ex.archived ? banner({
+      type: 'info', title: 'Ausgeblendet', text: 'Diese Übung steht für neue Einheiten nicht zur Auswahl. Dein Verlauf bleibt erhalten.',
+      actions: '<button type="button" class="btn btn-sm btn-secondary" data-act="restorecustom">Wieder einblenden</button>',
+    }) : ''}
     ${last ? `<p class="inline-note">${icon('history')}<span>Zuletzt ${esc(relativeDay(last.date))}: ${esc(lastText(last, ex))}</span></p>` : ''}
-    <article class="card exercise-detail">${exerciseDetailHTML(id)}</article>`;
+    <article class="card exercise-detail">${exerciseDetailHTML(id)}</article>
+    ${ex.custom ? `<div class="btn-stack">
+      <button type="button" class="btn btn-secondary" data-act="editcustom">${icon('edit')}Bearbeiten</button>
+      ${ex.archived ? '' : `<button type="button" class="btn btn-quiet text-danger" data-act="removecustom">${icon('trash')}${used ? 'Ausblenden' : 'Löschen'}</button>`}
+    </div>` : ''}`;
 }
 
 export function render(params = {}) {
@@ -143,6 +190,20 @@ export function mount(root, params = {}) {
       openRpeSheet();
     } else if (act === 'start') {
       startFlow(el.dataset.type);
+    } else if (act === 'free') {
+      if (store.state.draft) { navigate('#/training'); return; }
+      prepareFree();
+      navigate('#/training');
+    } else if (act === 'newcustom') {
+      const id = await openCustomExerciseSheet();
+      if (id) navigate(`#/uebung/${id}`);
+    } else if (act === 'editcustom' && params.exercise) {
+      openCustomExerciseSheet({ id: params.exercise });
+    } else if (act === 'removecustom' && params.exercise) {
+      const r = await removeCustomExercise(params.exercise);
+      if (r === 'deleted') navigate('#/plan', { replace: true });
+    } else if (act === 'restorecustom' && params.exercise) {
+      restoreCustomExercise(params.exercise);
     }
   };
   root.addEventListener('click', onClick);

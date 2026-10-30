@@ -1,9 +1,12 @@
 // Datenhaltung: IndexedDB als Hauptspeicher, localStorage als Spiegel. Keine Übertragung an Server.
 import { todayISO, uid, isISODate, debounce } from './util.js';
 import { normalizeAnchors } from './plan.js';
-import { EXERCISES } from './exercises.js';
+import { EXERCISES, isCustomId, setCustomExercises, WEIGHT_LABELS } from './exercises.js';
 
 export const SCHEMA = 1;
+/** A und B: Planeinheiten im Wechsel. F: freies Training mit selbst gewählten Übungen. */
+export const SESSION_TYPES = ['A', 'B', 'F'];
+const MAX_CUSTOM = 100;
 const DB_NAME = 'athletic-longevity';
 const DB_VERSION = 2;
 const DB_STORE = 'kv';
@@ -13,6 +16,9 @@ const DB_KEY = 'state';
 /** Geräte, zu denen ein Foto gehören kann (Varianten wie „Brustpresse leicht“ teilen sich das Gerät). */
 export const MACHINE_KEYS = Object.keys(EXERCISES).filter((id) => !EXERCISES[id].baseId);
 export const machineKey = (exId) => (EXERCISES[exId] && EXERCISES[exId].baseId) || exId;
+/** Gültiger Schlüssel für Foto/Einstellung: Katalog-Gerät oder eigene Übung dieses Zustands. */
+export const isMachineKey = (k, state) => MACHINE_KEYS.includes(k)
+  || (isCustomId(k) && !!state && Array.isArray(state.customExercises) && state.customExercises.some((c) => c.id === k));
 const LS_KEY = 'al-state-mirror-v1';
 export const THEME_KEY = 'al-theme';
 
@@ -31,6 +37,7 @@ export function defaultState(today = todayISO()) {
     settings: { theme: 'dark', restSec: null, sound: true, keepAwake: true },
     sessions: [],
     bodyWeights: [],
+    customExercises: [],
     photos: {},
     machineNotes: {},
     draft: null,
@@ -65,8 +72,10 @@ function cleanSet(st) {
 }
 
 function cleanExercise(e) {
-  if (!isObj(e) || typeof e.id !== 'string' || !EXERCISES[e.id]) return null;
-  return {
+  if (!isObj(e) || typeof e.id !== 'string') return null;
+  const custom = isCustomId(e.id);
+  if (!EXERCISES[e.id] && !custom) return null;
+  const out = {
     id: e.id,
     done: !!e.done,
     skipped: !!e.skipped,
@@ -74,10 +83,30 @@ function cleanExercise(e) {
     notes: str(e.notes),
     sets: Array.isArray(e.sets) ? e.sets.map(cleanSet).filter(Boolean).slice(0, 12) : [],
   };
+  // Name eigener Übungen mitspeichern – so bleibt der Verlauf auch ohne die Übung lesbar.
+  if (custom) out.name = str(e.name, 60).trim();
+  return out;
+}
+
+export function cleanCustomExercise(c) {
+  if (!isObj(c) || !isCustomId(c.id)) return null;
+  const name = str(c.name, 60).trim();
+  if (!name) return null;
+  const created = str(c.createdAt, 40) || new Date().toISOString();
+  return {
+    id: c.id,
+    name,
+    muscles: str(c.muscles, 80).trim(),
+    weightLabel: WEIGHT_LABELS.includes(c.weightLabel) ? c.weightLabel : 'kg',
+    note: str(c.note, 300).trim(),
+    archived: !!c.archived,
+    createdAt: created,
+    updatedAt: str(c.updatedAt, 40) || created,
+  };
 }
 
 export function cleanSession(x, isDraft = false) {
-  if (!isObj(x) || !isISODate(x.date) || !['A', 'B'].includes(x.type)) return null;
+  if (!isObj(x) || !isISODate(x.date) || !SESSION_TYPES.includes(x.type)) return null;
   const now = new Date().toISOString();
   return {
     id: str(x.id, 64) || uid(),
@@ -155,13 +184,30 @@ export function migrate(raw) {
   s.sessions = s.sessions.filter((x) => (seen.has(x.id) ? false : seen.add(x.id)));
   s.bodyWeights = Array.isArray(raw.bodyWeights) ? raw.bodyWeights.map(cleanWeight).filter(Boolean) : [];
   s.draft = raw.draft ? cleanSession(raw.draft, true) : null;
+  s.customExercises = [];
+  const customIds = new Set();
+  for (const c of Array.isArray(raw.customExercises) ? raw.customExercises : []) {
+    const clean = cleanCustomExercise(c);
+    if (!clean || customIds.has(clean.id) || s.customExercises.length >= MAX_CUSTOM) continue;
+    customIds.add(clean.id);
+    s.customExercises.push(clean);
+  }
+  // Eigene Übungen, die im Verlauf vorkommen, aber nicht (mehr) angelegt sind, wiederherstellen.
+  for (const sess of [...s.sessions, ...(s.draft ? [s.draft] : [])]) {
+    for (const ex of sess.exercises) {
+      if (!isCustomId(ex.id) || customIds.has(ex.id)) continue;
+      customIds.add(ex.id);
+      s.customExercises.push(cleanCustomExercise({ id: ex.id, name: ex.name || 'Eigene Übung' }));
+    }
+  }
+  const machineOk = (k) => MACHINE_KEYS.includes(k) || customIds.has(k);
   s.photos = {};
   if (isObj(raw.photos)) {
-    for (const [k, v] of Object.entries(raw.photos)) if (MACHINE_KEYS.includes(k) && typeof v === 'string') s.photos[k] = v.slice(0, 40);
+    for (const [k, v] of Object.entries(raw.photos)) if (machineOk(k) && typeof v === 'string') s.photos[k] = v.slice(0, 40);
   }
   s.machineNotes = {};
   if (isObj(raw.machineNotes)) {
-    for (const [k, v] of Object.entries(raw.machineNotes)) if (MACHINE_KEYS.includes(k) && typeof v === 'string' && v.trim()) s.machineNotes[k] = v.slice(0, 300);
+    for (const [k, v] of Object.entries(raw.machineNotes)) if (machineOk(k) && typeof v === 'string' && v.trim()) s.machineNotes[k] = v.slice(0, 300);
   }
   const m = isObj(raw.meta) ? raw.meta : {};
   s.meta = {
@@ -342,13 +388,20 @@ class Store {
     if (fromLs && (!chosen || savedAt(fromLs) > savedAt(chosen))) chosen = fromLs;
     this.isFresh = !chosen;
     this.state = migrate(chosen);
+    this.syncRegistry();
     try { localStorage.setItem(THEME_KEY, this.state.settings.theme); } catch { /* egal */ }
     return this.state;
+  }
+
+  /** Eigene Übungen für alle Ansichten bekannt machen. */
+  syncRegistry() {
+    setCustomExercises(this.state.customExercises);
   }
 
   /** Zustand ändern. render:false für Eingaben, die kein Neuzeichnen brauchen. */
   update(mutator, { render = true, now = false } = {}) {
     mutator(this.state);
+    this.syncRegistry();
     if (now) this.saveNow();
     else this.saveSoon();
     if (render) this.emit();
@@ -377,6 +430,7 @@ class Store {
 
   replace(next) {
     this.state = migrate(next);
+    this.syncRegistry();
     this.saveNow();
     this.emit();
   }
@@ -385,6 +439,7 @@ class Store {
     const theme = this.state.settings.theme;
     this.state = defaultState();
     this.state.settings.theme = theme;
+    this.syncRegistry();
     this.clearPhotos().catch(() => {});
     this.saveNow();
     this.emit();

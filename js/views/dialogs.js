@@ -2,7 +2,7 @@
 import { store, dataURLToBlob } from '../store.js';
 import { esc, todayISO, formatDate, daysBetween } from '../util.js';
 import { icon, openSheet, toast } from '../ui.js';
-import { EXERCISES, GENERAL_CUES } from '../exercises.js';
+import { exerciseDef, GENERAL_CUES } from '../exercises.js';
 import { illustration } from '../illustrations.js';
 import {
   WARNING_SIGNS, EMERGENCY_STEPS, ABORT_REASONS, RPE_SCALE, RPE_EXPLAINER, TALK_TEST, HEART_RATE_NOTE,
@@ -123,11 +123,23 @@ export function openRpeSheet() {
 /* ---------- Übungsanleitung ---------- */
 
 export function exerciseDetailHTML(id, { compact = false, machine = true } = {}) {
-  const ex = EXERCISES[id];
+  const ex = exerciseDef(id);
   if (!ex) return '';
   const list = (items) => items && items.length ? `<ul class="bullets">${items.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>` : '';
+  const machineHTML = machine ? `<div data-machine-slot="${esc(id)}">${machineBlockHTML(id, { compact })}</div>` : '';
+  if (ex.custom) {
+    // Eigene Übung: keine Schritt-für-Schritt-Anleitung, aber die allgemeinen Regeln
+    return `
+      ${machineHTML}
+      ${ex.note ? `<p class="callout">${esc(ex.note)}</p>` : ''}
+      <dl class="ex-facts"><div><dt>Körperbereich</dt><dd>${esc(ex.muscles || '–')}</dd></div><div><dt>Gewicht in</dt><dd>${esc(ex.weightLabel)}</dd></div></dl>
+      <h3 class="sub-title">Ausführung</h3>
+      <p class="body-text">Für eigene Übungen gibt es keine Schritt-für-Schritt-Anleitung. Lass dir die Ausführung beim ersten Mal vom Trainingspersonal zeigen und notiere oben deine Einstellung am Gerät.</p>
+      <h3 class="sub-title">Atmung</h3><p class="body-text">${esc(ex.breathing)} Nie die Luft anhalten.</p>
+      <h3 class="sub-title">Gilt für alle Übungen</h3>${list(GENERAL_CUES)}`;
+  }
   return `
-    ${machine ? `<div data-machine-slot="${esc(id)}">${machineBlockHTML(id, { compact })}</div><h3 class="sub-title">So geht die Übung</h3>` : ''}
+    ${machine ? `${machineHTML}<h3 class="sub-title">So geht die Übung</h3>` : ''}
     <div class="ex-figure">${illustration(id, `Illustration ${ex.name}`)}</div>
     <p class="ex-legend">Blasse Figur: Ausgangsposition. Kräftige Figur: Endposition. Der Pfeil zeigt die Bewegung.</p>
     ${ex.note ? `<p class="callout">${esc(ex.note)}</p>` : ''}
@@ -142,7 +154,7 @@ export function exerciseDetailHTML(id, { compact = false, machine = true } = {})
 }
 
 export function openExerciseSheet(id) {
-  const ex = EXERCISES[id];
+  const ex = exerciseDef(id);
   let off = null;
   let unsub = null;
   const { promise } = openSheet({
@@ -229,7 +241,12 @@ export async function importFromFile(file) {
   }
   const sm = parsed.summary;
   const hasData = store.state.sessions.length > 0 || store.state.bodyWeights.length > 0;
-  const range = sm.first ? `${formatDate(sm.first, 'numeric')} bis ${formatDate(sm.last, 'numeric')}` : 'keine Einheiten';
+  const range = !sm.first ? 'keine Einheiten'
+    : sm.first === sm.last ? formatDate(sm.first, 'numeric') : `${formatDate(sm.first, 'numeric')} bis ${formatDate(sm.last, 'numeric')}`;
+  if (sm.partial) {
+    importSessionsSheet(parsed, range);
+    return;
+  }
   openSheet({
     title: 'Sicherung wiederherstellen',
     body: `
@@ -239,6 +256,7 @@ export async function importFromFile(file) {
         <div><dt>Zeitraum</dt><dd>${esc(range)}</dd></div>
         <div><dt>Körpergewicht</dt><dd>${sm.bodyWeights} Einträge</dd></div>
         <div><dt>Gerätefotos</dt><dd>${sm.photos}</dd></div>
+        ${sm.customExercises ? `<div><dt>Eigene Übungen</dt><dd>${sm.customExercises}</dd></div>` : ''}
       </dl>
       ${hasData ? '<p class="sheet-text">Auf diesem Gerät sind bereits Daten vorhanden. „Ersetzen“ überschreibt alles mit der Sicherung, „Zusammenführen“ ergänzt nur fehlende Einheiten.</p>' : ''}
       <div class="btn-stack">
@@ -270,6 +288,45 @@ export async function importFromFile(file) {
           : `Zusammengeführt${written ? ` (+${written} Fotos)` : ''}`);
         rerender();
       }));
+    },
+  });
+}
+
+/**
+ * Datei mit einzelnen Einheiten (z. B. ein nachgetragenes Training): wird nur hinzugefügt,
+ * Profil, Plan und Einstellungen bleiben unverändert. Ersetzen ist hier bewusst nicht möglich.
+ */
+function importSessionsSheet(parsed, range) {
+  const sm = parsed.summary;
+  openSheet({
+    title: 'Einheiten hinzufügen',
+    body: `
+      <dl class="kv">
+        <div><dt>Einheiten</dt><dd>${sm.sessions}</dd></div>
+        <div><dt>${sm.first && sm.first === sm.last ? 'Datum' : 'Zeitraum'}</dt><dd>${esc(range)}</dd></div>
+        ${sm.customExercises ? `<div><dt>Eigene Übungen</dt><dd>${sm.customExercises}</dd></div>` : ''}
+      </dl>
+      ${sm.note ? `<p class="sheet-text">${esc(sm.note)}</p>` : ''}
+      <p class="sheet-text">Die Einheiten werden zu deinem Verlauf hinzugefügt. Profil, Plan, Einstellungen und vorhandene Einheiten bleiben unverändert. Die Planwoche richtet sich nach deinem Plan.</p>
+      <div class="btn-stack">
+        <button type="button" class="btn btn-primary" data-imp="add"${sm.sessions ? '' : ' disabled'}>Hinzufügen</button>
+        <button type="button" class="btn btn-quiet" data-sheet-close>Abbrechen</button>
+      </div>`,
+    onMount(sheet, close) {
+      sheet.querySelector('[data-imp="add"]').addEventListener('click', async (e) => {
+        e.currentTarget.disabled = true;
+        const { state, added, updated } = mergeStates(store.state, parsed.state, { assignWeeks: true });
+        state.draft = store.state.draft;
+        state.photos = { ...store.state.photos };
+        store.replace(state);
+        const written = await restorePhotos(parsed.photos, false);
+        close(true);
+        const n = added + updated;
+        toast(n
+          ? `${n} ${n === 1 ? 'Einheit' : 'Einheiten'} hinzugefügt${written ? ` (+${written} Fotos)` : ''}`
+          : 'Diese Einheiten sind schon in deinem Verlauf.');
+        rerender();
+      });
     },
   });
 }

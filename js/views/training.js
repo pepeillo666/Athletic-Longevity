@@ -5,8 +5,10 @@ import {
   weekInfo, phaseForWeek, nextWorkoutType, createSession, rpeTarget, rpeSpec, setsLabel, repsLabel, lastPerformance,
   progressionHint, rpeFeedback, isExerciseDone, sessionProgress, sessionAvgRpe, durationFromStart,
   sessionsInWeek, workoutExerciseIds, TOTAL_WEEKS, recoveryStatus, countByPlanWeek,
+  freeExercise, lastFreeSelection, freePlanCheck,
 } from '../plan.js';
-import { EXERCISES, WORKOUTS } from '../exercises.js';
+import { EXERCISES, WORKOUTS, exerciseDef, isSelectable } from '../exercises.js';
+import { openExercisePicker } from './picker.js';
 import { illustration } from '../illustrations.js';
 import { WARMUP, COOLDOWN, PRECHECK_ITEMS, ABORT_REASONS, TALK_TEST, EMERGENCY_SHORT } from '../content.js';
 import {
@@ -21,9 +23,25 @@ import {
 } from './common.js';
 import { hasPhoto, machineKey, machineNote, pickPhoto, hydratePhotos, thumbHTML } from '../photos.js';
 
-const ui = { type: null, week: null, open: null, finished: null };
+const ui = { type: null, week: null, open: null, finished: null, free: null };
 const CARDIO_TIMER = { 1: 10, 2: 10, 3: 15, 4: 15, 5: 20 };
 const SYMPTOM_REASONS = [ABORT_REASONS[0], ABORT_REASONS[1]];
+const MAX_SETS = 6;
+
+/** Freies Training direkt in der Auswahl öffnen (z. B. aus dem Plan). */
+export function prepareFree() {
+  ui.type = 'F';
+}
+
+/** Auswahl fürs freie Training: Vorschlag aus der letzten freien Einheit. */
+function freeState(week) {
+  if (!ui.free) {
+    const last = lastFreeSelection(store.state.sessions);
+    ui.free = { ids: last.ids, sets: last.sets || phaseForWeek(week).setsMax };
+  }
+  ui.free.ids = ui.free.ids.filter(isSelectable);
+  return ui.free;
+}
 
 const elapsedSec = (d) => {
   const start = Date.parse(d.startedAt);
@@ -32,9 +50,15 @@ const elapsedSec = (d) => {
 
 /* ---------- Start: Vorab-Check ---------- */
 
-export function startFlow(type, planWeek = null) {
+export function startFlow(type, planWeek = null, { exerciseIds = null, setCount = null } = {}) {
   const s = store.state;
   if (s.draft) { navigate('#/training'); return; }
+  if (type === 'F' && !(exerciseIds && exerciseIds.length)) {
+    // Ohne Auswahl erst zur Zusammenstellung
+    ui.type = 'F';
+    navigate('#/training');
+    return;
+  }
   const today = todayISO();
   const week = planWeek || weekInfo(s.plan.anchors, today).week;
   const needClear = !s.profile.clearance;
@@ -72,7 +96,9 @@ export function startFlow(type, planWeek = null) {
       });
       go.addEventListener('click', () => {
         unlockAudio();
-        const draft = createSession({ type, planWeek: week, date: todayISO(), startTime: nowTimeHM(), state: store.state });
+        const draft = createSession({
+          type, planWeek: week, date: todayISO(), startTime: nowTimeHM(), state: store.state, exerciseIds, setCount,
+        });
         draft.wellbeingBefore = wb;
         draft.precheck = true;
         store.update((x) => {
@@ -109,17 +135,16 @@ function renderStart() {
 
   const typeOpt = (t) => ({
     value: t,
-    html: `${esc(WORKOUTS[t].name)}${suggested === t ? '<small>als Nächstes</small>' : ''}`,
+    html: t === 'F'
+      ? 'Frei<small class="seg-sub">eigene Auswahl</small>'
+      : `<span class="lbl-long">${esc(WORKOUTS[t].name)}</span><span class="lbl-short">${esc(t)}</span>${suggested === t ? '<small>als Nächstes</small>' : ''}`,
   });
   const notes = [];
   if (recovery.kind === 'rest') notes.push(banner({ type: 'info', iconName: 'moon', title: recovery.title, text: esc(recovery.text) }));
   else if (thisWeek >= curPhase.sessionsMax) notes.push(banner({ type: 'info', iconName: 'check', title: 'Wochenziel erreicht', text: 'Du hast diese Woche schon alle geplanten Einheiten absolviert. Zusätzliche Bewegung am besten als lockerer Spaziergang.' }));
+  const free = type === 'F' ? freeState(week) : null;
 
-  return `
-    ${pageHead({ title: 'Training', subtitle: esc(`Woche ${info.week} von ${TOTAL_WEEKS}: ${curPhase.name}`) })}
-    ${notes.length ? `<div class="stack">${notes.join('')}</div>` : ''}
-    <section class="card">
-      ${segmented('type', [typeOpt('A'), typeOpt('B')], type, 'seg-lg')}
+  const planCard = `
       <div class="spec">
         <div><strong>${esc(setsLabel(phase).replace(/ Sätze| Satz/, ''))}</strong><span>${phase.setsMax === 1 ? 'Satz' : 'Sätze'}</span></div>
         <div><strong>${esc(repsLabel(phase).replace(' Wdh.', ''))}</strong><span><span class="lbl-long">Wiederholungen</span><span class="lbl-short">Wdh.</span></span></div>
@@ -130,7 +155,14 @@ function renderStart() {
           ${thumbHTML(id, illustration(id))}
           <span class="ex-preview-text"><strong>${esc(EXERCISES[id].name)}</strong><span>${esc(EXERCISES[id].optional ? 'Optional' : EXERCISES[id].muscles)}</span></span>
           ${icon('chevronRight', 'chev')}</a></li>`).join('')}
-      </ul>
+      </ul>`;
+
+  return `
+    ${pageHead({ title: 'Training', subtitle: esc(`Woche ${info.week} von ${TOTAL_WEEKS}: ${curPhase.name}`) })}
+    ${notes.length ? `<div class="stack">${notes.join('')}</div>` : ''}
+    <section class="card">
+      ${segmented('type', [typeOpt('A'), typeOpt('B'), typeOpt('F')], type, 'seg-lg seg-3')}
+      ${free ? freeCard(free, week, phase, target) : planCard}
     </section>
     <details class="card disclosure"${ui.week && ui.week !== info.week ? ' open' : ''}>
       <summary>Verpasste Einheit nachholen</summary>
@@ -140,8 +172,43 @@ function renderStart() {
           .map((w) => `<option value="${w}"${w === week ? ' selected' : ''}>Woche ${w}${w === info.week ? ' (aktuell)' : ''}</option>`).join('')}</select>
       </label>
     </details>
-    <button type="button" class="btn btn-primary btn-lg" data-act="begin">${icon('play')}Weiter zum Vorab-Check</button>
+    <button type="button" class="btn btn-primary btn-lg" data-act="begin"${free && !free.ids.length ? ' disabled' : ''}>${icon('play')}Weiter zum Vorab-Check</button>
     <a class="text-link center" href="#/verlauf/neu">Bereits trainiert? Einheit nachträglich eintragen</a>`;
+}
+
+function freeItem(id, k) {
+  const def = exerciseDef(id);
+  return `<li class="free-item">
+    <a class="free-link" href="#/uebung/${esc(id)}">
+      ${thumbHTML(id, illustration(id))}
+      <span class="ex-preview-text"><strong>${esc(def.name)}</strong><span>${esc(def.muscles || 'Eigene Übung')}</span></span>
+    </a>
+    <button type="button" class="icon-btn icon-btn-sm" data-free-remove="${k}" aria-label="${esc(def.name)} aus der Auswahl entfernen">${icon('close')}</button>
+  </li>`;
+}
+
+function freeCard(free, week, phase, target) {
+  const s = store.state;
+  const n = free.ids.length;
+  const check = freePlanCheck(n, free.sets, week, s.plan, s.profile);
+  const spec = rpeSpec(phase, target);
+  return `
+    <p class="body-text">Stell dir deine Einheit selbst zusammen – aus allen Geräten und deinen eigenen Übungen. Es gelten die Belastungsregeln von Woche ${week}.</p>
+    <div class="field"><span class="field-label">Sätze pro Übung</span>
+      ${segmented('fsets', [1, 2, 3].map((v) => ({ value: v, label: String(v) })), free.sets)}</div>
+    <div class="spec">
+      <div><strong>${n}</strong><span>${n === 1 ? 'Übung' : 'Übungen'}</span></div>
+      <div><strong>${esc(repsLabel(phase).replace(' Wdh.', ''))}</strong><span><span class="lbl-long">Wiederholungen</span><span class="lbl-short">Wdh.</span></span></div>
+      <div><strong>${esc(spec.value)}</strong><span>${esc(spec.caption)}</span></div>
+    </div>
+    ${n ? `<ul class="ex-preview free-list">${free.ids.map(freeItem).join('')}</ul>`
+      : '<p class="chart-empty">Noch keine Übungen ausgewählt.</p>'}
+    <button type="button" class="btn btn-secondary" data-act="pick">${icon(n ? 'edit' : 'plus')}${n ? 'Auswahl ändern' : 'Übungen auswählen'}</button>
+    ${check.over ? `<div class="callout callout-warn" data-free-over>
+      <p class="callout-title">Mehr als im Plan für Woche ${week}</p>
+      <p>Vorgesehen sind je Einheit ${check.planExercises} Übungen mit ${esc(setsLabel(phase))} bei ${esc(check.target.label)}. Deine Auswahl: ${n} ${n === 1 ? 'Übung' : 'Übungen'} × ${free.sets} ${free.sets === 1 ? 'Satz' : 'Sätze'} = ${check.total} Sätze.</p>
+      <p>Steigere den Umfang nur, wenn das zu deiner ärztlichen Freigabe passt – und halte auch dann das Belastungsziel ein.</p>
+    </div>` : ''}`;
 }
 
 /* ---------- Ansicht: laufende Einheit ---------- */
@@ -160,17 +227,19 @@ function setRow(i, j, st, target, def) {
     <p class="set-fb${fb ? ` fb-${fb.level}` : ''}" data-fb="${i}-${j}"${fb ? '' : ' hidden'}>${fb ? esc(fb.text) : ''}</p>`;
 }
 
-function exerciseStatus(ex, phase) {
+function exerciseStatus(ex, phase, free = false) {
   if (ex.skipped) return 'Übersprungen';
   if (isExerciseDone(ex)) return 'Erledigt';
   const done = ex.sets.filter((s) => s.done && !s.optional).length;
   const req = ex.sets.filter((s) => !s.optional).length;
-  const base = `${setsLabel(phase)} × ${repsLabel(phase)}`;
+  const n = ex.sets.length;
+  const base = free ? `${n} ${n === 1 ? 'Satz' : 'Sätze'} × ${repsLabel(phase)}` : `${setsLabel(phase)} × ${repsLabel(phase)}`;
   return done ? `${done} von ${req} Sätzen erledigt` : base;
 }
 
 function exerciseCard(d, ex, i, phase, target) {
-  const def = EXERCISES[ex.id];
+  const def = exerciseDef(ex.id, ex.name);
+  const free = d.type === 'F';
   const done = isExerciseDone(ex);
   const open = ui.open === i;
   const sessions = store.state.sessions;
@@ -187,13 +256,13 @@ function exerciseCard(d, ex, i, phase, target) {
     <button type="button" class="ex-head" data-toggle-ex="${i}" aria-expanded="${open}">
       <span class="ex-num" aria-hidden="true">${done ? icon('check') : ex.skipped ? icon('skip') : i + 1}</span>
       <span class="ex-head-text"><span class="ex-name">${esc(def.name)}${ex.optional ? ' <span class="tag">optional</span>' : ''}</span>
-        <span class="ex-meta">${esc(exerciseStatus(ex, phase))}</span></span>
+        <span class="ex-meta">${esc(exerciseStatus(ex, phase, free))}</span></span>
       ${icon('chevronDown', 'chev')}
     </button>
     <div class="ex-body">
-      <button type="button" class="ex-visual${hasPhoto(ex.id) ? ' is-photo' : ''}" data-ex-info="${ex.id}" aria-label="Anleitung für ${esc(def.name)} öffnen">
+      <button type="button" class="ex-visual${hasPhoto(ex.id) ? ' is-photo' : ''}" data-ex-info="${ex.id}" aria-label="${def.custom ? 'Details zu' : 'Anleitung für'} ${esc(def.name)} öffnen">
         ${hasPhoto(ex.id) ? `<img data-photo="${esc(machineKey(ex.id))}" alt="Dein Foto vom Gerät ${esc(def.name)}">` : illustration(ex.id)}
-        <span class="ex-visual-cta">${icon('book')}Anleitung</span>
+        <span class="ex-visual-cta">${icon('book')}${def.custom ? 'Details' : 'Anleitung'}</span>
       </button>
       ${machineNote(ex.id) ? `<p class="ex-setting">${icon('sliders')}<span>Deine Einstellung: <strong>${esc(machineNote(ex.id))}</strong></span></p>` : ''}
       ${hasPhoto(ex.id) ? '' : `<button type="button" class="link-btn ex-photo-link" data-photo-add="${ex.id}">${icon('camera')}Foto vom Gerät hinzufügen</button>`}
@@ -206,11 +275,16 @@ function exerciseCard(d, ex, i, phase, target) {
         <div class="set-head" aria-hidden="true"><span>Satz</span><span>${esc(def.weightLabel)}</span><span>Wdh.</span><span>RPE</span><span>Fertig</span></div>
         ${ex.sets.map((st, j) => setRow(i, j, st, target, def)).join('')}
       </div>
+      ${free ? `<div class="set-tools">
+        <button type="button" class="btn btn-sm btn-quiet" data-add-set="${i}"${ex.sets.length >= MAX_SETS ? ' disabled' : ''}>${icon('plus')}Satz</button>
+        <button type="button" class="btn btn-sm btn-quiet" data-remove-set="${i}"${ex.sets.length <= 1 ? ' disabled' : ''}>${icon('minus')}Satz</button>
+      </div>` : ''}
       <label class="field field-compact"><span class="sr-only">Notiz zur Übung</span>
         <textarea class="input" rows="1" data-ex-notes="${i}" placeholder="Notiz zu dieser Einheit">${esc(ex.notes)}</textarea></label>
       <div class="ex-actions">
         <button type="button" class="btn btn-sm ${done ? 'btn-good' : 'btn-secondary'}" data-ex-done="${i}" aria-pressed="${done}">${icon('check')}${done ? 'Erledigt' : 'Übung erledigt'}</button>
         <button type="button" class="btn btn-sm btn-quiet" data-ex-skip="${i}" aria-pressed="${ex.skipped}">${ex.skipped ? 'Doch machen' : 'Überspringen'}</button>
+        ${free ? `<button type="button" class="btn btn-sm btn-quiet text-danger" data-ex-remove="${i}">${icon('trash')}Entfernen</button>` : ''}
       </div>
     </div>
   </li>`;
@@ -273,13 +347,14 @@ function renderSession(d) {
     <div class="session-progress" aria-hidden="true"><span data-progbar style="transform:scaleX(${pct.toFixed(3)})"></span></div>
     <p class="session-count" data-progtext>${progText(prog)}</p>
     <div class="targets">
-      <span class="target">${esc(setsLabel(phase))}</span>
+      <span class="target">${d.type === 'F' ? 'Sätze nach Wahl' : esc(setsLabel(phase))}</span>
       <span class="target">${esc(repsLabel(phase))}</span>
       <button type="button" class="target target-btn" data-act="rpe">${esc(target.label)}${icon('info')}</button>
     </div>
     ${hr ? `<p class="inline-note">${icon('heart')}<span><strong>Ärztliche Pulsobergrenze: ${hr} Schläge pro Minute – nicht überschreiten.</strong> Zusätzlich gelten RPE-Ziel und Sprechtest.</span></p>` : ''}
     ${blockCard('warmup', WARMUP, d.warmupDone)}
     <ol class="ex-list">${d.exercises.map((ex, i) => exerciseCard(d, ex, i, phase, target)).join('')}</ol>
+    ${d.type === 'F' ? `<button type="button" class="btn btn-secondary" data-act="addex">${icon('plus')}Übung hinzufügen</button>` : ''}
     ${cardioCard(d, phase)}
     ${blockCard('cooldown', COOLDOWN, d.cooldownDone)}
     <div class="session-actions">
@@ -390,6 +465,16 @@ function advance(root, from) {
   setOpen(root, next, next >= 0);
 }
 
+/** Häufigste Satzzahl der Einheit – neue Übungen bekommen dieselbe. */
+function typicalSetCount(exercises, fallback) {
+  const freq = new Map();
+  for (const e of exercises) if (e.sets.length) freq.set(e.sets.length, (freq.get(e.sets.length) || 0) + 1);
+  let best = fallback;
+  let max = 0;
+  for (const [n, c] of freq) if (c > max) { max = c; best = n; }
+  return best;
+}
+
 function lastRequiredIndex(d) {
   let idx = -1;
   d.exercises.forEach((e, i) => { if (!e.optional) idx = i; });
@@ -459,6 +544,7 @@ function saveFinished(session) {
   ui.open = null;
   ui.type = null;
   ui.week = null;
+  ui.free = null;
   store.update((s) => {
     s.sessions.push(session);
     s.draft = null;
@@ -559,7 +645,7 @@ function mountSession(root) {
         if (isDone) advance(root, i);
       } else {
         const meta = root.querySelector(`.ex-card[data-ex="${i}"] .ex-meta`);
-        if (meta) meta.textContent = exerciseStatus(draft().exercises[i], phaseForWeek(draft().planWeek));
+        if (meta) meta.textContent = exerciseStatus(draft().exercises[i], phaseForWeek(draft().planWeek), draft().type === 'F');
       }
       refreshProgress(root);
       return;
@@ -603,6 +689,66 @@ function mountSession(root) {
       if (draft().exercises[i].skipped) advance(root, i);
       return;
     }
+    el = t.closest('[data-add-set]');
+    if (el) {
+      const i = Number(el.dataset.addSet);
+      store.update((s) => {
+        const ex = s.draft.exercises[i];
+        if (ex.sets.length >= MAX_SETS) return;
+        const prev = ex.sets[ex.sets.length - 1] || {};
+        ex.sets.push({ weight: prev.weight ?? null, reps: prev.reps ?? null, rpe: null, done: false, optional: false });
+        ex.done = false;
+        s.draft.updatedAt = new Date().toISOString();
+      }, { render: false });
+      refreshCard(root, i);
+      refreshProgress(root);
+      return;
+    }
+    el = t.closest('[data-remove-set]');
+    if (el) {
+      const i = Number(el.dataset.removeSet);
+      const ex = draft().exercises[i];
+      if (ex.sets.length <= 1) return;
+      if (ex.sets[ex.sets.length - 1].done) {
+        const ok = await confirmDialog({
+          title: 'Letzten Satz entfernen?', message: 'Der Satz ist schon als erledigt markiert. Seine Werte werden gelöscht.',
+          confirmLabel: 'Entfernen', danger: true,
+        });
+        if (!ok || !store.state.draft) return;
+      }
+      store.update((s) => {
+        s.draft.exercises[i].sets.pop();
+        s.draft.updatedAt = new Date().toISOString();
+      }, { render: false });
+      refreshCard(root, i);
+      refreshProgress(root);
+      return;
+    }
+    el = t.closest('[data-ex-remove]');
+    if (el) {
+      const i = Number(el.dataset.exRemove);
+      const ex = draft().exercises[i];
+      const name = exerciseDef(ex.id, ex.name).name;
+      if (draft().exercises.length <= 1) {
+        toast('Mindestens eine Übung bleibt in der Einheit.');
+        return;
+      }
+      if (ex.sets.some((x) => x.done)) {
+        const ok = await confirmDialog({
+          title: `${name} entfernen?`, message: 'Die eingetragenen Sätze dieser Übung werden gelöscht.',
+          confirmLabel: 'Entfernen', danger: true,
+        });
+        if (!ok || !store.state.draft) return;
+      }
+      if (ui.open === i) ui.open = null;
+      else if (ui.open > i) ui.open -= 1;
+      store.update((s) => {
+        s.draft.exercises.splice(i, 1);
+        s.draft.updatedAt = new Date().toISOString();
+      });
+      toast(`${name} entfernt`);
+      return;
+    }
     el = t.closest('[data-ex-info]');
     if (el) { openExerciseSheet(el.dataset.exInfo); return; }
     el = t.closest('[data-timer-start]');
@@ -634,6 +780,25 @@ function mountSession(root) {
       if (r && r.abort && store.state.draft) abortSession(r.reason);
     } else if (act === 'finish') {
       finishSheet();
+    } else if (act === 'addex') {
+      const d = draft();
+      const ids = await openExercisePicker({
+        exclude: d.exercises.map((e) => e.id), title: 'Übung hinzufügen', confirmLabel: 'Hinzufügen',
+      });
+      if (!ids || !ids.length || !store.state.draft) return;
+      const phase = phaseForWeek(d.planWeek);
+      const count = typicalSetCount(d.exercises, phase.setsMax);
+      const start = d.exercises.length;
+      ui.open = start;
+      store.update((s) => {
+        for (const id of ids) {
+          if (!s.draft.exercises.some((e) => e.id === id)) s.draft.exercises.push(freeExercise(id, phase, s.sessions, count));
+        }
+        s.draft.updatedAt = new Date().toISOString();
+      });
+      const card = document.querySelector(`.ex-card[data-ex="${start}"]`);
+      if (card) setTimeout(() => card.scrollIntoView({ behavior: 'smooth', block: 'start' }), 120);
+      toast(ids.length === 1 ? 'Übung hinzugefügt' : `${ids.length} Übungen hinzugefügt`);
     } else if (act === 'rpe') {
       openRpeSheet();
     } else if (act === 'discard') {
@@ -666,14 +831,34 @@ function mountSession(root) {
 
 function mountStart(root) {
   hydratePhotos(root);
-  const onClick = (e) => {
+  const onClick = async (e) => {
     const seg = e.target.closest('[data-seg="type"]');
     if (seg) { ui.type = seg.dataset.value; navigate('#/training'); return; }
+    const fsets = e.target.closest('[data-seg="fsets"]');
+    if (fsets && ui.free) { ui.free.sets = Number(fsets.dataset.value); navigate('#/training'); return; }
+    const rem = e.target.closest('[data-free-remove]');
+    if (rem && ui.free) {
+      ui.free.ids.splice(Number(rem.dataset.freeRemove), 1);
+      navigate('#/training');
+      return;
+    }
     const act = e.target.closest('[data-act]');
     if (!act) return;
     if (act.dataset.act === 'begin') {
       const s = store.state;
-      startFlow(ui.type || nextWorkoutType(s.sessions), ui.week || null);
+      const type = ui.type || nextWorkoutType(s.sessions);
+      if (type === 'F') {
+        if (!ui.free || !ui.free.ids.length) return;
+        startFlow('F', ui.week || null, { exerciseIds: [...ui.free.ids], setCount: ui.free.sets });
+      } else {
+        startFlow(type, ui.week || null);
+      }
+    } else if (act.dataset.act === 'pick') {
+      const ids = await openExercisePicker({ selected: ui.free ? ui.free.ids : [] });
+      if (ids && ui.free) {
+        ui.free.ids = ids;
+        navigate('#/training');
+      }
     } else if (act.dataset.act === 'backup') {
       doBackup();
     }

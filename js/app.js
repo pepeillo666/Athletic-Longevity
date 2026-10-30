@@ -18,7 +18,7 @@ import * as onboarding from './views/onboarding.js';
 const ROUTES = [
   { re: /^heute$/, view: dashboard, tab: 'heute', title: 'Heute' },
   { re: /^plan$/, view: planView, tab: 'plan', title: 'Plan' },
-  { re: /^uebung\/([a-z_]+)$/, view: planView, tab: 'plan', title: 'Übung', params: (m) => ({ exercise: m[1] }) },
+  { re: /^uebung\/([a-z0-9_]+)$/, view: planView, tab: 'plan', title: 'Übung', params: (m) => ({ exercise: m[1] }) },
   { re: /^training$/, view: training, tab: 'training', title: 'Training' },
   { re: /^verlauf$/, view: historyView, tab: 'verlauf', title: 'Verlauf' },
   { re: /^verlauf\/neu$/, view: historyView, tab: 'verlauf', title: 'Einheit nachtragen', params: () => ({ mode: 'edit', isNew: true }) },

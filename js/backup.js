@@ -1,11 +1,16 @@
 // Datensicherung: Export als JSON und CSV, Import aus einer Sicherung.
 import { todayISO, formatDate } from './util.js';
-import { migrate, cleanSession, MACHINE_KEYS } from './store.js';
-import { exerciseName } from './exercises.js';
-import { sortSessionsDesc } from './plan.js';
+import { migrate, cleanSession, isMachineKey } from './store.js';
+import { EXERCISES } from './exercises.js';
+import { sortSessionsDesc, weekInfo } from './plan.js';
 
 export const APP_ID = 'athletic-longevity';
 export const BACKUP_FORMAT = 1;
+/**
+ * Teil-Dateien mit einzelnen Einheiten (kind: 'sessions') haben Format 2.
+ * Ältere App-Versionen lehnen sie deshalb ab („bitte aktualisieren“), statt Daten zu ersetzen.
+ */
+export const SESSIONS_FORMAT = 2;
 
 /** photos: Map Gerät → Data-URL (optional) */
 export function buildBackup(state, appVersion, photos = null) {
@@ -22,11 +27,30 @@ export function buildBackup(state, appVersion, photos = null) {
       settings: state.settings,
       sessions: state.sessions,
       bodyWeights: state.bodyWeights,
+      customExercises: state.customExercises,
       machineNotes: state.machineNotes,
     },
   };
   if (photos && photos.size) out.photos = Object.fromEntries(photos);
   return out;
+}
+
+/** Teil-Datei mit einzelnen Einheiten (und den darin benutzten eigenen Übungen). */
+export function buildSessionsExport({ sessions, customExercises = [], appVersion, note = '' }) {
+  const used = new Set();
+  for (const s of sessions) for (const e of s.exercises || []) used.add(e.id);
+  return {
+    app: APP_ID,
+    format: SESSIONS_FORMAT,
+    kind: 'sessions',
+    appVersion,
+    exportedAt: new Date().toISOString(),
+    note,
+    data: {
+      sessions,
+      customExercises: customExercises.filter((c) => used.has(c.id)),
+    },
+  };
 }
 
 export function backupFile(state, appVersion, photos = null) {
@@ -49,6 +73,7 @@ function csvCell(v) {
 }
 
 const STATUS_DE = { completed: 'abgeschlossen', aborted: 'abgebrochen' };
+const TYPE_DE = { A: 'A', B: 'B', F: 'Frei' };
 
 export function sessionsCsv(state) {
   const header = [
@@ -58,10 +83,12 @@ export function sessionsCsv(state) {
     'Notiz Übung', 'Ausdauer (Min.)', 'Beschwerden', 'Notiz Einheit',
   ];
   const rows = [header];
+  const customNames = new Map((state.customExercises || []).map((c) => [c.id, c.name]));
+  const nameOf = (ex) => (EXERCISES[ex.id] ? EXERCISES[ex.id].name : customNames.get(ex.id) || ex.name || 'Eigene Übung');
   const sessions = sortSessionsDesc(state.sessions).reverse();
   for (const s of sessions) {
     const base = [
-      formatDate(s.date, 'numeric'), s.startTime, s.type, s.planWeek, STATUS_DE[s.status] || s.status,
+      formatDate(s.date, 'numeric'), s.startTime, TYPE_DE[s.type] || s.type, s.planWeek, STATUS_DE[s.status] || s.status,
       s.durationMin, s.wellbeingBefore, s.wellbeingAfter,
     ];
     const tail = [s.cardioMin, s.symptoms ? 'ja' : 'nein', s.notes];
@@ -70,7 +97,7 @@ export function sessionsCsv(state) {
       const sets = ex.sets.length ? ex.sets : [null];
       sets.forEach((st, i) => {
         rows.push([
-          ...base, exerciseName(ex.id), st ? i + 1 : '',
+          ...base, nameOf(ex), st ? i + 1 : '',
           st ? st.weight : null, st ? st.reps : null, st ? st.rpe : null,
           st ? (st.done ? 'ja' : 'nein') : '', ex.skipped ? 'ja' : 'nein', ex.notes, ...tail,
         ]);
@@ -143,14 +170,16 @@ export function parseBackup(text) {
   if (!data || typeof data !== 'object') {
     return { ok: false, error: 'Diese Datei stammt nicht aus Athletic Longevity.' };
   }
-  if (obj.format && obj.format > BACKUP_FORMAT) {
+  if (obj.format && obj.format > SESSIONS_FORMAT) {
     return { ok: false, error: 'Diese Sicherung stammt aus einer neueren App-Version. Bitte aktualisiere die App zuerst.' };
   }
+  // Teil-Datei (z. B. nachgetragenes Training): enthält nur Einheiten – darf nie alles ersetzen.
+  const partial = obj.kind === 'sessions' || obj.format === SESSIONS_FORMAT || (!data.profile && !data.plan);
   const state = migrate({ ...data, photos: {}, draft: null });
   const photos = {};
   if (obj.photos && typeof obj.photos === 'object' && !Array.isArray(obj.photos)) {
     for (const [k, v] of Object.entries(obj.photos)) {
-      if (MACHINE_KEYS.includes(k) && typeof v === 'string' && /^data:image\/(jpeg|png|webp);base64,/.test(v) && v.length < 8000000) photos[k] = v;
+      if (isMachineKey(k, state) && typeof v === 'string' && /^data:image\/(jpeg|png|webp);base64,/.test(v) && v.length < 8000000) photos[k] = v;
     }
   }
   const sessions = state.sessions.length;
@@ -161,8 +190,11 @@ export function parseBackup(text) {
     photos,
     summary: {
       exportedAt: obj.exportedAt || null,
+      partial,
+      note: partial && typeof obj.note === 'string' ? obj.note.slice(0, 300) : '',
       sessions,
       bodyWeights: state.bodyWeights.length,
+      customExercises: state.customExercises.length,
       photos: Object.keys(photos).length,
       first: dates[0] || null,
       last: dates[dates.length - 1] || null,
@@ -170,18 +202,39 @@ export function parseBackup(text) {
   };
 }
 
-/** Zusammenführen: vorhandene Daten bleiben, neue Einheiten/Einträge kommen hinzu. */
-export function mergeStates(current, incoming) {
+/**
+ * Zusammenführen: vorhandene Daten bleiben, neue Einheiten/Einträge kommen hinzu.
+ * Eigene Übungen mit gleichem Namen werden zusammengelegt (keine Dubletten).
+ * assignWeeks: Planwoche neu hinzugefügter Einheiten aus dem eigenen Plan berechnen (für Teil-Dateien).
+ */
+export function mergeStates(current, incoming, { assignWeeks = false } = {}) {
   const merged = migrate(JSON.parse(JSON.stringify(current)));
+  const norm = (n) => String(n || '').trim().toLocaleLowerCase('de');
+  const idMap = new Map();
+  let customAdded = 0;
+  for (const c of incoming.customExercises || []) {
+    if (merged.customExercises.some((x) => x.id === c.id)) continue;
+    const same = merged.customExercises.find((x) => !x.archived && norm(x.name) === norm(c.name));
+    if (same) { idMap.set(c.id, same.id); continue; }
+    merged.customExercises.push({ ...c });
+    customAdded++;
+  }
+  const mapId = (id) => idMap.get(id) || id;
   const byId = new Map(merged.sessions.map((s) => [s.id, s]));
   let added = 0;
   let updated = 0;
   for (const s of incoming.sessions) {
-    const clean = cleanSession(s);
+    const clean = cleanSession({
+      ...s,
+      exercises: (s.exercises || []).map((e) => ({ ...e, id: mapId(e.id) })),
+    });
     if (!clean) continue;
     const existing = byId.get(clean.id);
-    if (!existing) { byId.set(clean.id, clean); added++; }
-    else if ((clean.updatedAt || '') > (existing.updatedAt || '')) { byId.set(clean.id, clean); updated++; }
+    if (!existing) {
+      if (assignWeeks) clean.planWeek = weekInfo(merged.plan.anchors, clean.date).week;
+      byId.set(clean.id, clean);
+      added++;
+    } else if ((clean.updatedAt || '') > (existing.updatedAt || '')) { byId.set(clean.id, clean); updated++; }
   }
   merged.sessions = [...byId.values()];
   const weights = new Map(merged.bodyWeights.map((w) => [w.id, w]));
@@ -190,6 +243,9 @@ export function mergeStates(current, incoming) {
     if (!weights.has(w.id) && !dates.has(w.date)) { weights.set(w.id, w); dates.add(w.date); }
   }
   merged.bodyWeights = [...weights.values()];
-  for (const [k, v] of Object.entries(incoming.machineNotes || {})) if (!merged.machineNotes[k]) merged.machineNotes[k] = v;
-  return { state: merged, added, updated };
+  for (const [k, v] of Object.entries(incoming.machineNotes || {})) {
+    const key = mapId(k);
+    if (!merged.machineNotes[key]) merged.machineNotes[key] = v;
+  }
+  return { state: migrate(merged), added, updated, customAdded, idMap };
 }

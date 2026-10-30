@@ -281,6 +281,121 @@ export const EXERCISES = {
     focus: ['Die Ellenbogen bleiben am Körper.', 'Kein Schwung aus Rücken oder Hüfte.'],
     safety: [],
   },
+
+  /* ---------- Weitere Geräte (nicht Teil von Training A/B, für das freie Training) ---------- */
+
+  squatmachine: {
+    name: 'Kniebeuge-Maschine',
+    muscles: 'Oberschenkel vorn und hinten, Gesäß',
+    equipment: 'Kniebeuge-Maschine mit Polster und Hebelarm, im Stehen (im Studio z. B. „Legs“)',
+    setup: [
+      'Mit dem Gesicht zum Gerät auf die Standfläche stellen, Füße etwa hüftbreit.',
+      'Das Polster liegt vorn auf den Schultern, die Hände fassen die Griffe.',
+      'Ein eher leichtes Gewicht wählen – im Stehen ist die Belastung für Kreislauf und Gleichgewicht höher als an der Beinpresse.',
+    ],
+    steps: [
+      'Einatmen und langsam in die Knie gehen, das Gesäß dabei nach hinten schieben – wie beim Hinsetzen.',
+      'Nur so tief, wie es ohne Beschwerden geht – die Oberschenkel höchstens bis etwa waagerecht.',
+      'Ausatmen und gleichmäßig über die ganze Fußsohle aufrichten. Die Knie oben nicht ganz durchdrücken.',
+    ],
+    breathing: 'Einatmen beim Absenken, ausatmen beim Aufrichten.',
+    focus: [
+      'Die Knie zeigen in Richtung der Fußspitzen und kippen nicht nach innen.',
+      'Die Fersen bleiben am Boden, der Rücken bleibt gerade.',
+      'Ruhiges Tempo, unten nicht abfedern.',
+    ],
+    safety: [
+      'Nach dem Satz kurz aufrecht stehen bleiben und die Griffe halten, bevor du das Gerät verlässt – so beugst du Schwindel vor.',
+      'Schwindel, Druck in der Brust oder Atemnot: Satz sofort beenden, das Gerät kontrolliert in die Ausgangsstellung bringen und hinsetzen.',
+      'Drückt das Polster unangenehm auf Brustbein oder Narbe: Übung auslassen und ärztlich abklären lassen.',
+    ],
+  },
+
+  abcrunch: {
+    name: 'Bauchmaschine',
+    muscles: 'Gerade Bauchmuskulatur',
+    equipment: 'Bauchmaschine (Crunch-Gerät), sitzend',
+    setup: [
+      'Sitzhöhe so einstellen, dass Griffe bzw. Brustpolster etwa auf Schulterhöhe liegen.',
+      'Füße fest abstellen oder unter die Fußrollen, Rücken an die Lehne.',
+      'Griffe locker fassen – die Arme halten nur, sie ziehen nicht mit.',
+    ],
+    steps: [
+      'Ausatmen und den Oberkörper langsam nach vorn unten einrollen, als würdest du die Rippen Richtung Becken bringen.',
+      'Nur so weit einrollen, wie es ohne Schwung geht – ein kleiner Bewegungsweg reicht.',
+      'Einatmen und langsam wieder aufrichten, ohne dass das Gewicht aufschlägt.',
+    ],
+    breathing: 'Ausatmen beim Einrollen, einatmen beim Aufrichten.',
+    focus: [
+      'Bauchübungen verleiten zum Luftanhalten – hier besonders bewusst weiteratmen.',
+      'Nacken locker, das Kinn nicht auf die Brust drücken.',
+      'Die Bewegung kommt aus dem Bauch, nicht aus den Armen.',
+    ],
+    safety: [
+      'Merkst du, dass du presst oder die Luft anhältst: Gewicht deutlich reduzieren.',
+      'Ziehen oder Schmerz an Brustbein oder Narbe: Übung auslassen und ärztlich abklären lassen.',
+    ],
+  },
+
+  backext: {
+    name: 'Rückenstrecker-Maschine',
+    shortName: 'Rückenstrecker',
+    muscles: 'Unterer Rücken, Gesäß',
+    equipment: 'Rückenstrecker-Gerät (sitzend)',
+    setup: [
+      'Das Rückenpolster liegt etwa auf Höhe der Schulterblätter.',
+      'Füße fest auf die Fußstütze. Becken- oder Oberschenkelpolster so einstellen, dass das Becken ruhig bleibt.',
+      'Arme vor der Brust verschränken oder die Griffe locker fassen.',
+    ],
+    steps: [
+      'Aus der leicht vorgebeugten Ausgangsposition ausatmen und den Oberkörper ruhig nach hinten aufrichten, bis du aufrecht sitzt.',
+      'Nicht weiter nach hinten drücken – kein Hohlkreuz.',
+      'Einatmen und langsam wieder nach vorn zurückführen.',
+    ],
+    breathing: 'Ausatmen beim Aufrichten, einatmen beim Zurückführen.',
+    focus: [
+      'Langsam und ohne Schwung, besonders an den Umkehrpunkten.',
+      'Kopf in Verlängerung der Wirbelsäule, Blick geradeaus.',
+    ],
+    safety: ['Bei Rückenschmerzen den Bewegungsweg verkleinern oder die Übung auslassen.'],
+  },
+
+  armcurl: {
+    name: 'Bizeps-Maschine',
+    muscles: 'Vorderseite der Oberarme',
+    equipment: 'Bizeps-Maschine (Arm Curl) mit Armauflage',
+    setup: [
+      'Sitzhöhe so einstellen, dass die Oberarme ganz auf dem Polster liegen.',
+      'Die Ellenbogen liegen auf Höhe der Drehachse des Geräts.',
+      'Griffe locker von unten fassen.',
+    ],
+    steps: [
+      'Ausatmen und die Unterarme kontrolliert nach oben beugen.',
+      'Einatmen und langsam absenken, bis die Arme fast gestreckt sind – nicht fallen lassen.',
+    ],
+    breathing: 'Ausatmen beim Beugen, einatmen beim Absenken.',
+    focus: ['Die Oberarme bleiben auf dem Polster.', 'Handgelenke gerade, kein Schwung aus dem Oberkörper.'],
+    safety: [],
+  },
+
+  tricepsmachine: {
+    name: 'Trizeps-Maschine',
+    muscles: 'Rückseite der Oberarme',
+    equipment: 'Trizeps-Maschine mit Armauflage (sitzend)',
+    setup: [
+      'Sitzhöhe so einstellen, dass die Oberarme ganz auf dem Polster liegen.',
+      'Die Ellenbogen liegen auf Höhe der Drehachse des Geräts.',
+      'Griffe locker fassen, die Ellenbogen sind in der Ausgangsposition gebeugt.',
+    ],
+    steps: [
+      'Ausatmen und die Unterarme kontrolliert strecken, bis die Arme fast gestreckt sind.',
+      'Einatmen und langsam zurückführen, bis die Ellenbogen wieder gebeugt sind.',
+    ],
+    breathing: 'Ausatmen beim Strecken, einatmen beim Zurückführen.',
+    focus: ['Die Oberarme bleiben auf dem Polster.', 'Die Ellenbogen nicht ruckartig durchdrücken.'],
+    safety: [],
+    alternative: 'Manche Trizeps-Maschinen funktionieren anders, zum Beispiel wie ein Dip mit seitlichen Griffen. Lass dir dein Gerät beim ersten Mal zeigen.',
+  },
 };
 
 // Variante „leicht“ übernimmt Anleitung und Bild der Grundübung.
@@ -305,12 +420,84 @@ export const WORKOUTS = {
     name: 'Training B',
     exercises: ['legext', 'latpull', 'chestpress_light', 'abduction', 'reversefly', 'triceps', 'biceps'],
   },
+  // Freies Training: Übungen wählst du selbst (aus allen Geräten und eigenen Übungen).
+  F: { name: 'Freies Training', exercises: [] },
 };
 
-export const EXERCISE_ORDER = [...WORKOUTS.A.exercises, ...WORKOUTS.B.exercises];
+/** Geräte, die in Training A und B nicht vorkommen. */
+export const EXTRA_EXERCISES = ['squatmachine', 'abcrunch', 'backext', 'armcurl', 'tricepsmachine'];
 
-export function exerciseName(id, short = false) {
-  const ex = EXERCISES[id];
-  if (!ex) return id;
+export const EXERCISE_ORDER = [...WORKOUTS.A.exercises, ...WORKOUTS.B.exercises, ...EXTRA_EXERCISES];
+
+/* ---------- Eigene Übungen ---------- */
+
+export const WEIGHT_LABELS = ['kg', 'kg je Hantel', 'Stufe'];
+export const CUSTOM_BREATHING = 'Ausatmen bei der Anstrengung, einatmen beim Zurückführen.';
+
+/** Eigene Übungen haben IDs wie „c_lx2k9a7f3d“ und kollidieren so nie mit dem Katalog. */
+export const isCustomId = (id) => typeof id === 'string' && /^c_[a-z0-9_]{2,40}$/.test(id);
+
+const CUSTOM = new Map();
+
+function customDef(c) {
+  const name = (c && c.name) || 'Eigene Übung';
+  return {
+    id: c.id,
+    name,
+    shortName: name,
+    custom: true,
+    archived: !!c.archived,
+    muscles: (c && c.muscles) || '',
+    equipment: '',
+    weightLabel: WEIGHT_LABELS.includes(c && c.weightLabel) ? c.weightLabel : 'kg',
+    note: (c && c.note) || '',
+    setup: [], steps: [], focus: [], safety: [],
+    breathing: CUSTOM_BREATHING,
+  };
+}
+
+/** Wird vom Speicher bei jeder Änderung aufgerufen, damit alle Ansichten die eigenen Übungen kennen. */
+export function setCustomExercises(list) {
+  CUSTOM.clear();
+  for (const c of list || []) if (c && isCustomId(c.id)) CUSTOM.set(c.id, customDef(c));
+}
+
+/** Übung aus dem Katalog oder aus den eigenen Übungen. fallbackName: im Verlauf gespeicherter Name. */
+export function exerciseDef(id, fallbackName = '') {
+  if (EXERCISES[id]) return EXERCISES[id];
+  if (CUSTOM.has(id)) return CUSTOM.get(id);
+  if (isCustomId(id)) return customDef({ id, name: fallbackName });
+  return null;
+}
+
+export function exerciseName(id, short = false, fallbackName = '') {
+  const ex = exerciseDef(id, fallbackName);
+  if (!ex) return fallbackName || id;
   return short ? ex.shortName : ex.name;
+}
+
+/** Eigene Übungen (ohne ausgeblendete), alphabetisch. */
+export function customExerciseIds({ includeArchived = false } = {}) {
+  return [...CUSTOM.values()]
+    .filter((c) => includeArchived || !c.archived)
+    .sort((a, b) => a.name.localeCompare(b.name, 'de'))
+    .map((c) => c.id);
+}
+
+/** Gruppen für die Übungsauswahl im freien Training. Varianten wie „Brustpresse leicht“ fehlen bewusst. */
+export function pickerGroups() {
+  const plain = (ids) => ids.filter((id) => !EXERCISES[id].baseId);
+  return [
+    { key: 'A', title: 'Aus Training A', ids: plain(WORKOUTS.A.exercises) },
+    { key: 'B', title: 'Aus Training B', ids: plain(WORKOUTS.B.exercises) },
+    { key: 'extra', title: 'Weitere Geräte', ids: [...EXTRA_EXERCISES] },
+    { key: 'custom', title: 'Eigene Übungen', ids: customExerciseIds() },
+  ];
+}
+
+/** Darf diese Übung neu ausgewählt werden? (Katalog oder nicht ausgeblendete eigene Übung) */
+export function isSelectable(id) {
+  if (EXERCISES[id]) return !EXERCISES[id].baseId;
+  const c = CUSTOM.get(id);
+  return !!c && !c.archived;
 }

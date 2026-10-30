@@ -43,7 +43,10 @@ function figure(p, { ghost = false, accent = [] } = {}) {
     const t = p.torso;
     out += rect(t.cx - t.w / 2, t.top, t.w, t.bottom - t.top, t.w / 2.4, 'ill-fill');
   } else if (p.shoulder && p.hip) {
-    out += line(p.shoulder, p.hip, 'ill-torso');
+    // accent 'torso': der Rumpf ist der bewegte Teil (z. B. Bauch- oder Rückenstrecker-Maschine)
+    const cls = !ghost && accent.includes('torso') ? 'ill-torso ill-accent' : 'ill-torso';
+    // spine: Kontrollpunkt für einen gebeugten Rücken (Einrollen)
+    out += p.spine ? `<path d="M${P(p.shoulder)} Q${P(p.spine)} ${P(p.hip)}" class="${cls}"/>` : line(p.shoulder, p.hip, cls);
   }
   if (p.shoulderBar) out += line(p.shoulderBar[0], p.shoulderBar[1], 'ill-torso');
   (p.arms || []).forEach((arm, i) => { out += limb(arm, `arm${i}`); });
@@ -270,6 +273,113 @@ const SCENES = {
     </g>`;
   },
 
+  armcurl() {
+    // Armauflage: Oberarme liegen auf dem Polster, nur die Unterarme bewegen sich.
+    const hip = [80, 106];
+    const shoulder = [90, 62];
+    const elbow = [118, 84];
+    const base = { head: [94, 46], shoulder, hip, legs: [[hip, [114, 108], [116, 142]]] };
+    return `<g transform="translate(-4 0)">
+      ${padLine([62, 114], [100, 114])}${mach([80, 117], [80, 142])}
+      ${padLine([92, 75], [111, 91])}${mach([111, 92], [126, 104])}${mach([126, 104], [126, 142])}
+      ${weightStack(182, 26, 142, 24)}
+      <g class="ill-ghost">${circle([140, 106], 4.5, 'ill-weight')}</g>
+      ${figure({ ...base, arms: [[shoulder, elbow, [140, 106]]] }, { ghost: true })}
+      ${figure({ ...base, arms: [[shoulder, elbow, [124, 56]]] }, { accent: ['arm0:1'] })}
+      ${circle([124, 56], 4.5, 'ill-weight')}${circle(elbow, 3.5, 'ill-pivot')}
+      ${curve([152, 102], [160, 62], [136, 48])}
+    </g>`;
+  },
+
+  tricepsmachine() {
+    const hip = [80, 106];
+    const shoulder = [90, 62];
+    const elbow = [118, 84];
+    const base = { head: [94, 46], shoulder, hip, legs: [[hip, [114, 108], [116, 142]]] };
+    return `<g transform="translate(-4 0)">
+      ${padLine([62, 114], [100, 114])}${mach([80, 117], [80, 142])}
+      ${padLine([92, 75], [111, 91])}${mach([111, 92], [126, 104])}${mach([126, 104], [126, 142])}
+      ${weightStack(182, 26, 142, 24)}
+      <g class="ill-ghost">${circle([126, 58], 4.5, 'ill-weight')}</g>
+      ${figure({ ...base, arms: [[shoulder, elbow, [126, 58]]] }, { ghost: true })}
+      ${figure({ ...base, arms: [[shoulder, elbow, [142, 104]]] }, { accent: ['arm0:1'] })}
+      ${circle([142, 104], 4.5, 'ill-weight')}${circle(elbow, 3.5, 'ill-pivot')}
+      ${curve([138, 48], [162, 60], [154, 100])}
+    </g>`;
+  },
+
+  squatmachine() {
+    // Stehend, Gesicht zum Gerät, Polster vorn an den Schultern; der Hebelarm dreht um den Drehpunkt links.
+    const pivot = [58, 44];
+    const padUp = [124.6, 50];
+    const padDown = [115, 79];
+    const up = {
+      head: [133, 29], shoulder: [135, 45], hip: [143, 88],
+      legs: [[[143, 88], [141, 116], [140, 142]]], arms: [[[135, 45], [124, 60], [114, 49]]],
+    };
+    const down = {
+      head: [117, 62], shoulder: [126, 75], hip: [151, 111],
+      legs: [[[151, 111], [125, 121], [140, 142]]], arms: [[[126, 75], [114, 88], [104, 72]]],
+    };
+    return `<g transform="translate(16 0)">
+      ${weightStack(10, 24, 142, 24)}
+      ${mach([44, 142], pivot)}
+      <g class="ill-ghost">${mach(pivot, padUp)}${circle(padUp, 7, 'ill-roller')}</g>
+      ${figure(up, { ghost: true })}
+      <g class="ill-ghost">${circle([114, 49], 4.5, 'ill-weight')}</g>
+      ${mach(pivot, padDown)}${circle(pivot, 4, 'ill-pivot')}${circle(padDown, 7, 'ill-roller')}
+      ${figure(down, { accent: ['leg0'] })}
+      ${circle([104, 72], 4.5, 'ill-weight')}
+      ${curve([170, 82], [182, 100], [170, 118])}
+    </g>`;
+  },
+
+  abcrunch() {
+    // Der Rumpf rollt sich ein; Griffe auf Schulterhöhe, die Arme halten nur.
+    const hip = [84, 104];
+    const legs = [[hip, [118, 106], [116, 140]]];
+    return `<g transform="translate(8 0)">
+      ${weightStack(16, 40, 142, 22)}
+      ${padLine([66, 58], [72, 104])}${padLine([70, 112], [110, 112])}${mach([90, 115], [90, 142])}
+      ${circle([123, 134], 5.5, 'ill-roller')}
+      <g class="ill-ghost">${circle([94, 54], 4.5, 'ill-weight')}</g>
+      ${figure({ head: [79, 44], shoulder: [80, 60], hip, legs, arms: [[[80, 60], [93, 72], [94, 54]]] }, { ghost: true })}
+      ${figure({
+        head: [110, 52], shoulder: [101, 64], spine: [86, 81], hip, legs,
+        arms: [[[101, 64], [108, 79], [116, 65]]],
+      }, { accent: ['torso'] })}
+      ${circle([116, 64], 4.5, 'ill-weight')}
+      ${curve([98, 28], [126, 28], [130, 50])}
+    </g>`;
+  },
+
+  backext() {
+    // Aus leichter Vorbeuge aufrichten bis zum aufrechten Sitz – nicht weiter nach hinten.
+    const hip = [84, 104];
+    const legs = [[hip, [118, 106], [120, 140]]];
+    return `<g transform="translate(6 0)">
+      ${weightStack(184, 30, 142, 24)}
+      ${padLine([70, 112], [108, 112])}${mach([88, 115], [88, 142])}
+      ${padLine([98, 97], [116, 97])}
+      <g class="ill-ghost">${padLine([96, 60], [87, 78])}</g>
+      ${figure({ head: [112, 51], shoulder: [104, 65], hip, legs, arms: [[[104, 65], [104, 83], [115, 76]]] }, { ghost: true })}
+      ${padLine([71, 60], [73, 80])}
+      ${figure({ head: [79, 44], shoulder: [80, 60], hip, legs, arms: [[[80, 60], [90, 76], [96, 64]]] }, { accent: ['torso'] })}
+      ${curve([128, 46], [110, 20], [90, 26])}
+    </g>`;
+  },
+
+  machine() {
+    // Neutrales Gerät für eigene Übungen ohne Foto
+    return `<g transform="translate(10 0)">
+      ${weightStack(150, 24, 142, 30)}
+      ${padLine([62, 64], [66, 106])}${padLine([64, 114], [108, 114])}${mach([86, 117], [86, 142])}
+      ${mach([122, 142], [126, 62])}
+      ${thin([102, 80], [126, 62])}${circle([126, 62], 5, 'ill-pulley')}${circle([102, 80], 5, 'ill-weight')}
+      ${line([130, 59], [165, 33], 'ill-cable')}
+    </g>`;
+  },
+
   bike() {
     const hip = [96, 84];
     const shoulder = [118, 46];
@@ -290,7 +400,8 @@ const SCENES = {
 };
 
 export function illustration(id, title = '') {
-  const key = id === 'chestpress_light' ? 'chestpress' : id;
+  let key = id === 'chestpress_light' ? 'chestpress' : id;
+  if (typeof id === 'string' && /^c_/.test(id)) key = 'machine'; // eigene Übung
   const scene = SCENES[key];
   if (!scene) return '';
   const aria = title ? ` role="img" aria-label="${esc(title)}"` : ' aria-hidden="true"';

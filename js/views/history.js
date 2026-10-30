@@ -3,8 +3,10 @@ import { store } from '../store.js';
 import { esc, todayISO, formatDate, formatDuration, fmtNum, deepClone, isISODate, nowTimeHM } from '../util.js';
 import {
   sortSessionsDesc, sessionProgress, sessionAvgRpe, weekInfo, createSession, TOTAL_WEEKS,
+  freeExercise, lastFreeSelection, phaseForWeek,
 } from '../plan.js';
-import { EXERCISES, WORKOUTS } from '../exercises.js';
+import { WORKOUTS, exerciseDef } from '../exercises.js';
+import { openExercisePicker } from './picker.js';
 import { icon, pageHead, confirmDialog, toast, segmented, banner } from '../ui.js';
 import { navigate } from '../router.js';
 import {
@@ -22,7 +24,7 @@ function listItem(s) {
   if (s.durationMin) meta.push(formatDuration(s.durationMin));
   meta.push(`${p.handled} von ${p.total} Übungen`);
   return `<li><a class="log-item" href="#/verlauf/${esc(s.id)}">
-    <span class="log-badge${s.status === 'aborted' ? ' is-aborted' : ''}" aria-hidden="true">${esc(s.type)}</span>
+    <span class="log-badge${s.status === 'aborted' ? ' is-aborted' : s.type === 'F' ? ' is-free' : ''}" aria-hidden="true">${esc(s.type)}</span>
     <span class="log-text">
       <strong>${esc(WORKOUTS[s.type].name)}<span class="log-week">Woche ${s.planWeek}</span></strong>
       <span>${esc(meta.join(', '))}</span>
@@ -72,7 +74,7 @@ function renderDetail(id) {
   const p = sessionProgress(s);
   const avg = sessionAvgRpe(s);
   const exHTML = s.exercises.map((ex) => {
-    const def = EXERCISES[ex.id];
+    const def = exerciseDef(ex.id, ex.name);
     const rows = ex.sets.map((st, j) => `<tr class="${st.done ? '' : 'is-off'}">
       <td>${j + 1}${st.optional ? '<small> opt.</small>' : ''}</td><td>${st.weight != null ? esc(numStr(st.weight)) : '–'}</td>
       <td>${st.reps ?? '–'}</td><td>${st.rpe ?? '–'}</td><td>${st.done ? icon('check', 'ok') : '–'}</td></tr>`).join('');
@@ -86,7 +88,7 @@ function renderDetail(id) {
   const extras = [];
   extras.push(`Aufwärmen ${s.warmupDone ? 'erledigt' : 'nicht markiert'}`);
   extras.push(`Abwärmen ${s.cooldownDone ? 'erledigt' : 'nicht markiert'}`);
-  if (s.cardioMin) extras.push(`Ausdauer ${s.cardioMin} Min.`);
+  if (s.cardioMin) extras.push(`Ausdauer ${s.cardioMin} Minuten`);
   return `
     ${pageHead({
       title: WORKOUTS[s.type].name,
@@ -134,13 +136,37 @@ function ensureEditing(params) {
   return editing;
 }
 
+/** Übungen zum Nachtragen oder Bearbeiten hinzufügen – die Sätze gelten als erledigt. */
+async function addExercises(session) {
+  const ids = await openExercisePicker({
+    exclude: session.exercises.map((e) => e.id), title: 'Übung hinzufügen', confirmLabel: 'Hinzufügen',
+  });
+  if (!ids || !ids.length || !editing || editing.session !== session) return;
+  const phase = phaseForWeek(session.planWeek);
+  const counts = session.exercises.map((e) => e.sets.length).filter(Boolean);
+  const count = counts.length ? counts[counts.length - 1] : phase.setsMax;
+  for (const id of ids) {
+    if (session.exercises.some((e) => e.id === id)) continue;
+    const others = store.state.sessions.filter((x) => x.id !== session.id);
+    const ex = freeExercise(id, phase, others, count);
+    ex.sets.forEach((st) => { st.done = true; });
+    session.exercises.push(ex);
+  }
+  navigate(location.hash);
+}
+
 function markRequiredDone(session) {
   session.exercises.forEach((ex) => ex.sets.forEach((st) => { if (!st.optional) st.done = true; }));
 }
 
 function rebuildNew() {
   const cur = editing.session;
-  const fresh = createSession({ type: cur.type, planWeek: cur.planWeek, date: cur.date, startTime: cur.startTime, state: store.state, status: 'completed' });
+  // Freies Training: mit den Übungen der letzten freien Einheit vorbelegen
+  const last = cur.type === 'F' ? lastFreeSelection(store.state.sessions) : null;
+  const fresh = createSession({
+    type: cur.type, planWeek: cur.planWeek, date: cur.date, startTime: cur.startTime, state: store.state, status: 'completed',
+    exerciseIds: last ? last.ids : null, setCount: last ? last.sets : null,
+  });
   markRequiredDone(fresh);
   Object.assign(fresh, {
     id: cur.id, durationMin: cur.durationMin, wellbeingBefore: cur.wellbeingBefore, wellbeingAfter: cur.wellbeingAfter,
@@ -169,7 +195,7 @@ function renderEdit(params) {
   const weekOpts = Array.from({ length: TOTAL_WEEKS }, (_, k) => k + 1)
     .map((w) => `<option value="${w}"${w === s.planWeek ? ' selected' : ''}>Woche ${w}</option>`).join('');
   const exHTML = s.exercises.map((ex, i) => {
-    const def = EXERCISES[ex.id];
+    const def = exerciseDef(ex.id, ex.name);
     return `<section class="card card-tight" data-edit-ex="${i}">
       <div class="card-row"><h3 class="card-title">${esc(def.name)}${ex.optional ? ' <span class="tag">optional</span>' : ''}</h3>
         <label class="mini-toggle"><input type="checkbox" data-ex-skipped="${i}" ${ex.skipped ? 'checked' : ''}><span>Übersprungen</span></label></div>
@@ -180,6 +206,7 @@ function renderEdit(params) {
       <div class="ex-actions">
         <button type="button" class="btn btn-sm btn-secondary" data-add-set="${i}"${ex.sets.length >= 6 ? ' disabled' : ''}>${icon('plus')}Satz</button>
         <button type="button" class="btn btn-sm btn-secondary" data-remove-set="${i}"${ex.sets.length <= 1 ? ' disabled' : ''}>${icon('minus')}Satz</button>
+        <button type="button" class="btn btn-sm btn-quiet text-danger" data-edit-remove="${i}">${icon('trash')}Übung entfernen</button>
       </div>
       <label class="field field-compact"><span class="sr-only">Notiz</span><textarea class="input" rows="1" data-ex-note="${i}" placeholder="Notiz zur Übung">${esc(ex.notes)}</textarea></label>
     </section>`;
@@ -188,7 +215,7 @@ function renderEdit(params) {
   return `
     ${pageHead({ title: e.isNew ? 'Einheit nachtragen' : 'Einheit bearbeiten', back })}
     <form class="form" data-edit-form novalidate>
-      ${e.isNew ? `<div class="field"><span class="field-label">Training</span>${segmented('etype', [{ value: 'A', label: 'Training A' }, { value: 'B', label: 'Training B' }], s.type)}</div>` : ''}
+      ${e.isNew ? `<div class="field"><span class="field-label">Training</span>${segmented('etype', [{ value: 'A', label: 'Training A' }, { value: 'B', label: 'Training B' }, { value: 'F', label: 'Frei' }], s.type)}</div>` : ''}
       <div class="field-grid">
         <label class="field"><span class="field-label">Datum</span><input class="input" type="date" data-k="date" value="${esc(s.date)}" max="${todayISO()}" required></label>
         <label class="field"><span class="field-label">Startzeit</span><input class="input" type="time" data-k="startTime" value="${esc(s.startTime)}"></label>
@@ -206,7 +233,8 @@ function renderEdit(params) {
       <label class="field"><span class="field-label">Ausdauer (Min.)</span><input class="input" type="text" inputmode="numeric" data-k="cardioMin" value="${esc(numStr(s.cardioMin))}"></label>
       <label class="field"><span class="field-label">Notiz</span><textarea class="input" rows="3" data-k="notes">${esc(s.notes)}</textarea></label>
       <h2 class="section-title">Übungen</h2>
-      ${exHTML}
+      ${s.exercises.length ? exHTML : '<p class="body-text muted">Füge die Übungen hinzu, die du gemacht hast.</p>'}
+      <button type="button" class="btn btn-secondary" data-act="edit-addex">${icon('plus')}Übung hinzufügen</button>
       <div class="btn-stack sticky-actions">
         <button type="submit" class="btn btn-primary btn-lg">${icon('check')}Speichern</button>
         <a class="btn btn-secondary" href="${back.href}" data-cancel>Abbrechen</a>
@@ -328,7 +356,7 @@ function mountEdit(root, params) {
     if (add) {
       const ex = s.exercises[Number(add.dataset.addSet)];
       const lastSet = ex.sets[ex.sets.length - 1] || {};
-      ex.sets.push({ weight: lastSet.weight ?? null, reps: lastSet.reps ?? null, rpe: null, done: true, optional: true });
+      ex.sets.push({ weight: lastSet.weight ?? null, reps: lastSet.reps ?? null, rpe: null, done: true, optional: s.type !== 'F' });
       navigate(location.hash);
       return;
     }
@@ -337,6 +365,16 @@ function mountEdit(root, params) {
       const ex = s.exercises[Number(rem.dataset.removeSet)];
       if (ex.sets.length > 1) ex.sets.pop();
       navigate(location.hash);
+      return;
+    }
+    const exRem = t.closest('[data-edit-remove]');
+    if (exRem) {
+      s.exercises.splice(Number(exRem.dataset.editRemove), 1);
+      navigate(location.hash);
+      return;
+    }
+    if (t.closest('[data-act="edit-addex"]')) {
+      addExercises(s);
       return;
     }
     if (t.closest('[data-cancel]')) editing = null;

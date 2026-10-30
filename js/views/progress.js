@@ -5,7 +5,7 @@ import {
   programStats, consistencyStats, calendarWeeks, weekInfo, isCompleted, sortSessionsDesc, exerciseTopWeight,
   exerciseTotalReps, sessionAvgRpe, phaseForWeek, rpeTarget, TOTAL_WEEKS,
 } from '../plan.js';
-import { EXERCISES, EXERCISE_ORDER } from '../exercises.js';
+import { EXERCISE_ORDER, exerciseDef, customExerciseIds } from '../exercises.js';
 import { icon, pageHead, settingsButton, toast, confirmDialog } from '../ui.js';
 import { lineChart, barChart, dotCalendar, valueTable } from '../charts.js';
 import { bodyWeightCsvFile, shareOrDownload } from '../backup.js';
@@ -26,13 +26,15 @@ function exerciseSeries(sessions, exId) {
   return rows;
 }
 
+/** Übungen mit erledigten Sätzen: erst der Katalog in Planreihenfolge, dann eigene Übungen. */
 function exercisesWithData(sessions) {
   const set = new Set();
   for (const s of sessions) {
     if (!isCompleted(s)) continue;
     for (const ex of s.exercises) if (ex.sets.some((st) => st.done)) set.add(ex.id);
   }
-  return EXERCISE_ORDER.filter((id) => set.has(id));
+  const custom = customExerciseIds({ includeArchived: true });
+  return [...EXERCISE_ORDER, ...custom].filter((id) => set.has(id));
 }
 
 export function render() {
@@ -60,19 +62,20 @@ export function render() {
   const weeksTable = valueTable(['Planwoche', 'Einheiten', 'Ziel'], stats.weeks.map((w) => [`Woche ${w.week}`, String(w.done), `${w.min}${w.max > w.min ? `–${w.max}` : ''}`]));
 
   const exChips = withData.length ? `<div class="chips" role="tablist" aria-label="Übung wählen">${withData.map((id) => `
-      <button type="button" class="chip${id === ui.ex ? ' active' : ''}" role="tab" aria-selected="${id === ui.ex}" data-ex="${id}">${esc(EXERCISES[id].shortName)}</button>`).join('')}</div>` : '';
+      <button type="button" class="chip${id === ui.ex ? ' active' : ''}" role="tab" aria-selected="${id === ui.ex}" data-ex="${id}">${esc(exerciseDef(id).shortName)}</button>`).join('')}</div>` : '';
+  const exDef = ui.ex ? exerciseDef(ui.ex) : null;
 
   const exSection = ui.ex ? `
     <section class="card">
       <h2 class="card-title">Gewicht je Übung</h2>
-      <p class="card-sub">Höchstes Gewicht pro Einheit in ${esc(EXERCISES[ui.ex].weightLabel)}</p>
+      <p class="card-sub">Höchstes Gewicht pro Einheit in ${esc(exDef.weightLabel)}</p>
       ${exChips}
       <div class="chart-box" data-chart="weight"></div>
-      ${valueTable(['Datum', EXERCISES[ui.ex].weightLabel, 'Wdh. gesamt'], exRows.map((r) => [formatDate(r.date, 'numeric'), r.weight != null ? numStr(r.weight) : '–', r.reps != null ? String(r.reps) : '–']))}
+      ${valueTable(['Datum', exDef.weightLabel, 'Wdh. gesamt'], exRows.map((r) => [formatDate(r.date, 'numeric'), r.weight != null ? numStr(r.weight) : '–', r.reps != null ? String(r.reps) : '–']))}
     </section>
     <section class="card">
       <h2 class="card-title">Wiederholungen</h2>
-      <p class="card-sub">${esc(EXERCISES[ui.ex].name)}: Summe aller erledigten Sätze pro Einheit</p>
+      <p class="card-sub">${esc(exDef.name)}: Summe aller erledigten Sätze pro Einheit</p>
       <div class="chart-box" data-chart="reps"></div>
     </section>` : `
     <section class="card">
@@ -138,7 +141,7 @@ function drawCharts(root) {
   }
 
   if (ui.ex) {
-    const def = EXERCISES[ui.ex];
+    const def = exerciseDef(ui.ex);
     const rows = exerciseSeries(sorted, ui.ex);
     const wEl = root.querySelector('[data-chart="weight"]');
     if (wEl) {

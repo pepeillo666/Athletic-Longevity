@@ -1,7 +1,7 @@
 // Eigene Gerätefotos: aufnehmen oder auswählen, verkleinern, lokal speichern und anzeigen.
 // Die Fotos verlassen das Gerät nie (außer in deiner eigenen Sicherung).
 import { store, machineKey } from './store.js';
-import { EXERCISES } from './exercises.js';
+import { exerciseDef } from './exercises.js';
 import { esc } from './util.js';
 import { icon, toast, openSheet, confirmDialog } from './ui.js';
 
@@ -122,7 +122,8 @@ export function pickPhoto(exId) {
 
 export function openPhotoViewer(exId) {
   const key = machineKey(exId);
-  const name = EXERCISES[key] ? EXERCISES[key].name : '';
+  const def = exerciseDef(key);
+  const name = def ? def.name : '';
   openSheet({
     title: name || 'Foto',
     className: 'sheet-photo',
@@ -134,7 +135,7 @@ export function openPhotoViewer(exId) {
 /** Foto-Bereich mit dauerhafter Geräteeinstellung. */
 export function machineBlockHTML(exId, { compact = false } = {}) {
   const key = machineKey(exId);
-  const def = EXERCISES[key];
+  const def = exerciseDef(key);
   const name = def ? def.name : '';
   const note = store.state.machineNotes[key] || '';
   const photo = store.state.photos[key]
