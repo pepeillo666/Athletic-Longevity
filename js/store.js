@@ -5,8 +5,14 @@ import { EXERCISES } from './exercises.js';
 
 export const SCHEMA = 1;
 const DB_NAME = 'athletic-longevity';
+const DB_VERSION = 2;
 const DB_STORE = 'kv';
+const PHOTO_STORE = 'photos';
 const DB_KEY = 'state';
+
+/** Geräte, zu denen ein Foto gehören kann (Varianten wie „Brustpresse leicht“ teilen sich das Gerät). */
+export const MACHINE_KEYS = Object.keys(EXERCISES).filter((id) => !EXERCISES[id].baseId);
+export const machineKey = (exId) => (EXERCISES[exId] && EXERCISES[exId].baseId) || exId;
 const LS_KEY = 'al-state-mirror-v1';
 export const THEME_KEY = 'al-theme';
 
@@ -25,6 +31,8 @@ export function defaultState(today = todayISO()) {
     settings: { theme: 'dark', restSec: null, sound: true, keepAwake: true },
     sessions: [],
     bodyWeights: [],
+    photos: {},
+    machineNotes: {},
     draft: null,
     meta: { lastBackupAt: null, savedAt: null, dismissed: {} },
   };
@@ -147,6 +155,14 @@ export function migrate(raw) {
   s.sessions = s.sessions.filter((x) => (seen.has(x.id) ? false : seen.add(x.id)));
   s.bodyWeights = Array.isArray(raw.bodyWeights) ? raw.bodyWeights.map(cleanWeight).filter(Boolean) : [];
   s.draft = raw.draft ? cleanSession(raw.draft, true) : null;
+  s.photos = {};
+  if (isObj(raw.photos)) {
+    for (const [k, v] of Object.entries(raw.photos)) if (MACHINE_KEYS.includes(k) && typeof v === 'string') s.photos[k] = v.slice(0, 40);
+  }
+  s.machineNotes = {};
+  if (isObj(raw.machineNotes)) {
+    for (const [k, v] of Object.entries(raw.machineNotes)) if (MACHINE_KEYS.includes(k) && typeof v === 'string' && v.trim()) s.machineNotes[k] = v.slice(0, 300);
+  }
   const m = isObj(raw.meta) ? raw.meta : {};
   s.meta = {
     lastBackupAt: str(m.lastBackupAt, 40) || null,
@@ -162,33 +178,83 @@ function openDB() {
   return new Promise((resolve, reject) => {
     if (typeof indexedDB === 'undefined') { reject(new Error('IndexedDB nicht verfügbar')); return; }
     let req;
-    try { req = indexedDB.open(DB_NAME, 1); } catch (e) { reject(e); return; }
+    try { req = indexedDB.open(DB_NAME, DB_VERSION); } catch (e) { reject(e); return; }
     req.onupgradeneeded = () => {
       if (!req.result.objectStoreNames.contains(DB_STORE)) req.result.createObjectStore(DB_STORE);
+      if (!req.result.objectStoreNames.contains(PHOTO_STORE)) req.result.createObjectStore(PHOTO_STORE);
     };
-    req.onsuccess = () => resolve(req.result);
+    req.onsuccess = () => {
+      const db = req.result;
+      // Bei einem späteren Datenbank-Update andere offene Fenster nicht blockieren
+      db.onversionchange = () => db.close();
+      resolve(db);
+    };
     req.onerror = () => reject(req.error || new Error('IndexedDB-Fehler'));
     req.onblocked = () => reject(new Error('IndexedDB blockiert'));
   });
 }
 
-function idbGet(db, key) {
+function idbGet(db, key, storeName = DB_STORE) {
   return new Promise((resolve, reject) => {
-    const tx = db.transaction(DB_STORE, 'readonly');
-    const req = tx.objectStore(DB_STORE).get(key);
+    const tx = db.transaction(storeName, 'readonly');
+    const req = tx.objectStore(storeName).get(key);
     req.onsuccess = () => resolve(req.result ?? null);
     req.onerror = () => reject(req.error);
   });
 }
 
-function idbPut(db, key, value) {
+function idbPut(db, key, value, storeName = DB_STORE) {
   return new Promise((resolve, reject) => {
-    const tx = db.transaction(DB_STORE, 'readwrite');
-    tx.objectStore(DB_STORE).put(value, key);
+    const tx = db.transaction(storeName, 'readwrite');
+    tx.objectStore(storeName).put(value, key);
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
     tx.onabort = () => reject(tx.error || new Error('Transaktion abgebrochen'));
   });
+}
+
+function idbDelete(db, key, storeName) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(storeName, 'readwrite');
+    if (key === null) tx.objectStore(storeName).clear();
+    else tx.objectStore(storeName).delete(key);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error || new Error('Transaktion abgebrochen'));
+  });
+}
+
+function idbAll(db, storeName) {
+  return new Promise((resolve, reject) => {
+    const out = new Map();
+    const tx = db.transaction(storeName, 'readonly');
+    const req = tx.objectStore(storeName).openCursor();
+    req.onsuccess = () => {
+      const cur = req.result;
+      if (cur) { out.set(cur.key, cur.value); cur.continue(); } else resolve(out);
+    };
+    req.onerror = () => reject(req.error);
+  });
+}
+
+/* ---------- Fotos: als ArrayBuffer + Typ gespeichert (robust in Safari) ---------- */
+
+export function blobToDataURL(blob) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = () => reject(r.error);
+    r.readAsDataURL(blob);
+  });
+}
+
+export function dataURLToBlob(dataURL) {
+  const m = /^data:([^;,]+)?(;base64)?,(.*)$/s.exec(dataURL || '');
+  if (!m || !m[2]) return null;
+  const bin = atob(m[3]);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new Blob([bytes], { type: m[1] || 'image/jpeg' });
 }
 
 function withTimeout(promise, ms) {
@@ -208,6 +274,52 @@ class Store {
     this.saveFailed = false;
     this.onSaveError = null;
     this.saveSoon = debounce(() => this.save(), 250);
+    this.photoData = new Map(); // Gerät → Data-URL, für Sicherungen ohne Wartezeit
+  }
+
+  get photosSupported() {
+    return !!this.db;
+  }
+
+  async getPhoto(key) {
+    if (!this.db) return null;
+    const rec = await idbGet(this.db, key, PHOTO_STORE);
+    if (!rec || !rec.data) return null;
+    return new Blob([rec.data], { type: rec.type || 'image/jpeg' });
+  }
+
+  async putPhoto(key, blob) {
+    if (!this.db) throw new Error('Fotos werden in diesem Browser nicht unterstützt.');
+    const data = blob.arrayBuffer ? await blob.arrayBuffer() : await new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(r.result);
+      r.onerror = () => reject(r.error);
+      r.readAsArrayBuffer(blob);
+    });
+    await idbPut(this.db, key, { type: blob.type || 'image/jpeg', data }, PHOTO_STORE);
+    this.photoData.set(key, await blobToDataURL(blob));
+  }
+
+  async deletePhoto(key) {
+    if (this.db) await idbDelete(this.db, key, PHOTO_STORE);
+    this.photoData.delete(key);
+  }
+
+  async clearPhotos() {
+    if (this.db) await idbDelete(this.db, null, PHOTO_STORE);
+    this.photoData.clear();
+  }
+
+  /** Alle Fotos als Data-URLs vorhalten (für Sicherungen). */
+  async loadPhotoData() {
+    if (!this.db) return;
+    try {
+      const all = await idbAll(this.db, PHOTO_STORE);
+      this.photoData.clear();
+      for (const [key, rec] of all) {
+        if (rec && rec.data) this.photoData.set(key, await blobToDataURL(new Blob([rec.data], { type: rec.type || 'image/jpeg' })));
+      }
+    } catch { /* Fotos sind optional */ }
   }
 
   async load() {
@@ -273,6 +385,7 @@ class Store {
     const theme = this.state.settings.theme;
     this.state = defaultState();
     this.state.settings.theme = theme;
+    this.clearPhotos().catch(() => {});
     this.saveNow();
     this.emit();
   }

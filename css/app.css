@@ -929,3 +929,45 @@ body.has-live.has-timer .view { padding-bottom: calc(var(--tabbar-h) + var(--saf
   .lbl-short { display: inline; }
 }
 .inline-note strong { color: var(--text); font-weight: 650; }
+
+/* ============ Gerätefotos ============ */
+.machine { display: flex; flex-direction: column; gap: 10px; }
+.photo { margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.photo-btn {
+  display: block; width: 100%; padding: 0; border: 0; cursor: zoom-in;
+  border-radius: var(--r-md); overflow: hidden; background: var(--surface-2); aspect-ratio: 4 / 3;
+}
+.photo-btn img { display: block; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity .25s; }
+.photo.has-photo-loaded .photo-btn img { opacity: 1; }
+.photo-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.photo-empty {
+  display: grid; grid-template-columns: auto 1fr; gap: 14px; align-items: center; width: 100%;
+  padding: 16px; border-radius: var(--r-md); cursor: pointer; text-align: left; color: var(--text);
+  background: var(--surface-2); border: 1.5px dashed var(--line-strong);
+}
+.photo-empty-icon { width: 48px; height: 48px; border-radius: 14px; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); }
+.photo-empty-icon .icon { width: 24px; height: 24px; }
+.photo-empty-text { display: flex; flex-direction: column; gap: 2px; }
+.photo-empty-text strong { font-size: 16px; }
+.photo-empty-text span { font-size: 14px; color: var(--text-2); }
+.machine-compact .photo-btn { aspect-ratio: 16 / 10; }
+.sheet-photo .sheet-body { gap: 0; }
+.photo-full { border-radius: var(--r-md); overflow: hidden; background: #000; }
+.photo-full img { display: block; width: 100%; height: auto; max-height: 72vh; object-fit: contain; }
+
+.ex-thumb.has-photo img { width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity .2s; }
+.ex-thumb.has-photo.has-photo-loaded img { opacity: 1; }
+.ex-visual.is-photo { padding: 0; overflow: hidden; aspect-ratio: 16 / 10; }
+.ex-visual.is-photo img { display: block; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity .25s; }
+.ex-visual.is-photo.has-photo-loaded img { opacity: 1; }
+.ex-setting { display: flex; gap: 8px; align-items: flex-start; font-size: 15px; color: var(--text-2); }
+.ex-setting .icon { width: 18px; height: 18px; margin-top: 2px; color: var(--accent); }
+.ex-setting strong { color: var(--text); font-weight: 600; }
+.ex-photo-link { align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; text-decoration: none; font-size: 15px; font-weight: 500; min-height: 36px; }
+.ex-photo-link .icon { width: 18px; height: 18px; }
+
+/* Gewichtsblock in den Gerätezeichnungen */
+.ill-frame { fill: none; stroke: var(--ill-machine); stroke-width: 3; }
+.ill-rod { stroke: var(--ill-machine); stroke-width: 1.5; opacity: .7; }
+.ill-plate { fill: var(--ill-machine); opacity: .8; }
+.ill-pin { stroke: var(--ill-body); stroke-width: 3; }

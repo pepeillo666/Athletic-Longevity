@@ -19,6 +19,7 @@ import {
 import {
   wellbeingPicker, toggleWb, wellbeingText, rpeOptions, numStr, numOrNull, intOrNull, lastNoteFor, lastText,
 } from './common.js';
+import { hasPhoto, machineKey, machineNote, pickPhoto, hydratePhotos, thumbHTML } from '../photos.js';
 
 const ui = { type: null, week: null, open: null, finished: null };
 const CARDIO_TIMER = { 1: 10, 2: 10, 3: 15, 4: 15, 5: 20 };
@@ -126,7 +127,7 @@ function renderStart() {
       </div>
       <ul class="ex-preview">${ids.map((id) => `
         <li><a class="ex-preview-item" href="#/uebung/${id}">
-          <span class="ex-thumb">${illustration(id)}</span>
+          ${thumbHTML(id, illustration(id))}
           <span class="ex-preview-text"><strong>${esc(EXERCISES[id].name)}</strong><span>${esc(EXERCISES[id].optional ? 'Optional' : EXERCISES[id].muscles)}</span></span>
           ${icon('chevronRight', 'chev')}</a></li>`).join('')}
       </ul>
@@ -190,9 +191,12 @@ function exerciseCard(d, ex, i, phase, target) {
       ${icon('chevronDown', 'chev')}
     </button>
     <div class="ex-body">
-      <button type="button" class="ex-visual" data-ex-info="${ex.id}" aria-label="Anleitung für ${esc(def.name)} öffnen">
-        ${illustration(ex.id)}<span class="ex-visual-cta">${icon('book')}Anleitung</span>
+      <button type="button" class="ex-visual${hasPhoto(ex.id) ? ' is-photo' : ''}" data-ex-info="${ex.id}" aria-label="Anleitung für ${esc(def.name)} öffnen">
+        ${hasPhoto(ex.id) ? `<img data-photo="${esc(machineKey(ex.id))}" alt="Dein Foto vom Gerät ${esc(def.name)}">` : illustration(ex.id)}
+        <span class="ex-visual-cta">${icon('book')}Anleitung</span>
       </button>
+      ${machineNote(ex.id) ? `<p class="ex-setting">${icon('sliders')}<span>Deine Einstellung: <strong>${esc(machineNote(ex.id))}</strong></span></p>` : ''}
+      ${hasPhoto(ex.id) ? '' : `<button type="button" class="link-btn ex-photo-link" data-photo-add="${ex.id}">${icon('camera')}Foto vom Gerät hinzufügen</button>`}
       ${def.note ? `<p class="inline-note">${icon('info')}<span>${esc(def.note)}</span></p>` : ''}
       <p class="ex-cue">${esc(def.breathing)}</p>
       <p class="ex-last">${lastLine}</p>
@@ -203,7 +207,7 @@ function exerciseCard(d, ex, i, phase, target) {
         ${ex.sets.map((st, j) => setRow(i, j, st, target, def)).join('')}
       </div>
       <label class="field field-compact"><span class="sr-only">Notiz zur Übung</span>
-        <textarea class="input" rows="1" data-ex-notes="${i}" placeholder="Notiz, z. B. Sitzeinstellung">${esc(ex.notes)}</textarea></label>
+        <textarea class="input" rows="1" data-ex-notes="${i}" placeholder="Notiz zu dieser Einheit">${esc(ex.notes)}</textarea></label>
       <div class="ex-actions">
         <button type="button" class="btn btn-sm ${done ? 'btn-good' : 'btn-secondary'}" data-ex-done="${i}" aria-pressed="${done}">${icon('check')}${done ? 'Erledigt' : 'Übung erledigt'}</button>
         <button type="button" class="btn btn-sm btn-quiet" data-ex-skip="${i}" aria-pressed="${ex.skipped}">${ex.skipped ? 'Doch machen' : 'Überspringen'}</button>
@@ -350,7 +354,9 @@ function refreshCard(root, i) {
   if (!old) return;
   const tmp = document.createElement('ol');
   tmp.innerHTML = exerciseCard(d, d.exercises[i], i, phase, target);
-  old.replaceWith(tmp.firstElementChild);
+  const card = tmp.firstElementChild;
+  old.replaceWith(card);
+  hydratePhotos(card);
 }
 
 function refreshProgress(root) {
@@ -524,6 +530,8 @@ function mountSession(root) {
 
   const onClick = async (e) => {
     const t = e.target;
+    const photoBtn = t.closest('[data-photo-add]');
+    if (photoBtn) { pickPhoto(photoBtn.dataset.photoAdd); return; }
     let el = t.closest('[data-set-done]');
     if (el) {
       const row = el.closest('[data-set]');
@@ -647,6 +655,7 @@ function mountSession(root) {
   root.addEventListener('input', onInput);
   root.addEventListener('change', onInput);
   root.addEventListener('click', onClick);
+  hydratePhotos(root);
   return () => {
     clearInterval(iv);
     root.removeEventListener('input', onInput);
@@ -656,6 +665,7 @@ function mountSession(root) {
 }
 
 function mountStart(root) {
+  hydratePhotos(root);
   const onClick = (e) => {
     const seg = e.target.closest('[data-seg="type"]');
     if (seg) { ui.type = seg.dataset.value; navigate('#/training'); return; }

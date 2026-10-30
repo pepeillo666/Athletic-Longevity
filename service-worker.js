@@ -3,7 +3,7 @@
  * Bei jeder Veröffentlichung CACHE_VERSION erhöhen (und APP_VERSION in js/version.js).
  * Alle Pfade sind relativ – funktioniert unter https://pepeillo666.github.io/athletic-longevity/
  */
-const CACHE_VERSION = 'al-v1.0.0';
+const CACHE_VERSION = 'al-v1.1.0';
 
 const ASSETS = [
   './',
@@ -16,6 +16,7 @@ const ASSETS = [
   './js/content.js',
   './js/exercises.js',
   './js/illustrations.js',
+  './js/photos.js',
   './js/plan.js',
   './js/pwa.js',
   './js/router.js',

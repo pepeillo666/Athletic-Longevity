@@ -12,6 +12,7 @@ import { icon, pageHead, settingsButton, toast, confirmDialog } from '../ui.js';
 import { openRpeSheet, exerciseDetailHTML } from './dialogs.js';
 import { startFlow } from './training.js';
 import { lastText } from './common.js';
+import { thumbHTML, bindMachineBlocks, hydratePhotos } from '../photos.js';
 
 function weekChip(w, info) {
   const cls = ['wk'];
@@ -72,7 +73,7 @@ function renderPlan() {
         <button type="button" class="btn btn-sm btn-secondary" data-act="start" data-type="${type}">${icon('play')}Starten</button></div>
       <ul class="ex-preview">${w.exercises.map((id) => `
         <li><a class="ex-preview-item" href="#/uebung/${id}">
-          <span class="ex-thumb">${illustration(id)}</span>
+          ${thumbHTML(id, illustration(id))}
           <span class="ex-preview-text"><strong>${esc(EXERCISES[id].name)}</strong>
             <span>${esc(EXERCISES[id].optional ? `Optional, ab Woche ${s.plan.bicepsFromWeek}` : EXERCISES[id].muscles)}</span></span>
           ${icon('chevronRight', 'chev')}</a></li>`).join('')}</ul>
@@ -117,7 +118,9 @@ export function render(params = {}) {
   return renderPlan();
 }
 
-export function mount(root) {
+export function mount(root, params = {}) {
+  const offMachine = params.exercise ? bindMachineBlocks(root) : null;
+  if (!params.exercise) hydratePhotos(root);
   const onClick = async (e) => {
     const el = e.target.closest('[data-act]');
     if (!el) return;
@@ -143,5 +146,8 @@ export function mount(root) {
     }
   };
   root.addEventListener('click', onClick);
-  return () => root.removeEventListener('click', onClick);
+  return () => {
+    root.removeEventListener('click', onClick);
+    if (offMachine) offMachine();
+  };
 }

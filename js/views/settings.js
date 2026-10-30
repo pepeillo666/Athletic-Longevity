@@ -37,6 +37,7 @@ export function render() {
       <div class="card-row"><h2 class="card-title">${icon('download')}Datensicherung</h2></div>
       <p class="body-text">Deine Trainingsdaten liegen nur auf diesem Gerät. Werden Websitedaten gelöscht, sind sie weg – sichere sie deshalb regelmäßig, zum Beispiel in „Dateien“ oder per Mail an dich selbst.</p>
       <p class="backup-status">${esc(lastBackupText())}</p>
+      ${Object.keys(s.photos).length ? `<p class="field-hint">Die Sicherung enthält auch ${Object.keys(s.photos).length === 1 ? 'dein Gerätefoto' : `deine ${Object.keys(s.photos).length} Gerätefotos`} und deine Geräteeinstellungen.</p>` : ''}
       <div class="btn-stack">
         <button type="button" class="btn btn-primary" data-act="backup">${icon('download')}Sicherung erstellen (JSON)</button>
         <button type="button" class="btn btn-secondary" data-act="restore">${icon('upload')}Sicherung wiederherstellen</button>

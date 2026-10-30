@@ -130,6 +130,7 @@ async function boot() {
     console.error(e);
   }
   applyTheme(store.state.settings.theme);
+  store.loadPhotoData();
   store.onSaveError = () => toast('Speichern im Gerätespeicher ist fehlgeschlagen. Bitte erstelle eine Sicherung.', { type: 'error', duration: 8000 });
   setRouterImpl({ rerender: () => renderRoute({ keepScroll: true }) });
   store.subscribe(() => renderRoute({ keepScroll: true }));

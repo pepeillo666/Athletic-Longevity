@@ -1,5 +1,5 @@
 // Gemeinsam genutzte Dialoge und Aktionen.
-import { store } from '../store.js';
+import { store, dataURLToBlob } from '../store.js';
 import { esc, todayISO, formatDate, daysBetween } from '../util.js';
 import { icon, openSheet, toast } from '../ui.js';
 import { EXERCISES, GENERAL_CUES } from '../exercises.js';
@@ -10,6 +10,7 @@ import {
 import { backupFile, sessionsCsvFile, shareOrDownload, parseBackup, mergeStates } from '../backup.js';
 import { APP_VERSION } from '../version.js';
 import { rerender } from '../router.js';
+import { machineBlockHTML, bindMachineBlocks, hydratePhotos } from '../photos.js';
 
 /* ---------- Warnzeichen ---------- */
 
@@ -121,11 +122,12 @@ export function openRpeSheet() {
 
 /* ---------- Übungsanleitung ---------- */
 
-export function exerciseDetailHTML(id, { compact = false } = {}) {
+export function exerciseDetailHTML(id, { compact = false, machine = true } = {}) {
   const ex = EXERCISES[id];
   if (!ex) return '';
   const list = (items) => items && items.length ? `<ul class="bullets">${items.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>` : '';
   return `
+    ${machine ? `<div data-machine-slot="${esc(id)}">${machineBlockHTML(id, { compact })}</div><h3 class="sub-title">So geht die Übung</h3>` : ''}
     <div class="ex-figure">${illustration(id, `Illustration ${ex.name}`)}</div>
     <p class="ex-legend">Blasse Figur: Ausgangsposition. Kräftige Figur: Endposition. Der Pfeil zeigt die Bewegung.</p>
     ${ex.note ? `<p class="callout">${esc(ex.note)}</p>` : ''}
@@ -141,13 +143,32 @@ export function exerciseDetailHTML(id, { compact = false } = {}) {
 
 export function openExerciseSheet(id) {
   const ex = EXERCISES[id];
-  return openSheet({ title: ex ? ex.name : 'Übung', body: exerciseDetailHTML(id, { compact: true }), className: 'sheet-tall' }).promise;
+  let off = null;
+  let unsub = null;
+  const { promise } = openSheet({
+    title: ex ? ex.name : 'Übung',
+    body: exerciseDetailHTML(id, { compact: true }),
+    className: 'sheet-tall',
+    onMount(sheet) {
+      off = bindMachineBlocks(sheet);
+      // Nach neuem oder gelöschtem Foto den Gerätebereich im Sheet aktualisieren
+      unsub = store.subscribe(() => {
+        const slot = sheet.querySelector('[data-machine-slot]');
+        const focused = document.activeElement && slot && slot.contains(document.activeElement);
+        if (slot && !focused) {
+          slot.innerHTML = machineBlockHTML(id, { compact: true });
+          hydratePhotos(slot);
+        }
+      });
+    },
+  });
+  return promise.finally(() => { if (off) off(); if (unsub) unsub(); });
 }
 
 /* ---------- Sicherung ---------- */
 
 export async function doBackup({ preferDownload = false } = {}) {
-  const file = backupFile(store.state, APP_VERSION);
+  const file = backupFile(store.state, APP_VERSION, store.photoData);
   let result;
   try {
     result = await shareOrDownload(file, { preferDownload });
@@ -217,6 +238,7 @@ export async function importFromFile(file) {
         <div><dt>Einheiten</dt><dd>${sm.sessions}</dd></div>
         <div><dt>Zeitraum</dt><dd>${esc(range)}</dd></div>
         <div><dt>Körpergewicht</dt><dd>${sm.bodyWeights} Einträge</dd></div>
+        <div><dt>Gerätefotos</dt><dd>${sm.photos}</dd></div>
       </dl>
       ${hasData ? '<p class="sheet-text">Auf diesem Gerät sind bereits Daten vorhanden. „Ersetzen“ überschreibt alles mit der Sicherung, „Zusammenführen“ ergänzt nur fehlende Einheiten.</p>' : ''}
       <div class="btn-stack">
@@ -225,25 +247,51 @@ export async function importFromFile(file) {
         <button type="button" class="btn btn-quiet" data-sheet-close>Abbrechen</button>
       </div>`,
     onMount(sheet, close) {
-      sheet.querySelectorAll('[data-imp]').forEach((b) => b.addEventListener('click', () => {
-        if (b.dataset.imp === 'replace') {
+      sheet.querySelectorAll('[data-imp]').forEach((b) => b.addEventListener('click', async () => {
+        sheet.querySelectorAll('[data-imp]').forEach((x) => { x.disabled = true; });
+        const replace = b.dataset.imp === 'replace';
+        if (replace) {
           const next = parsed.state;
           next.draft = null;
+          next.photos = {};
           next.meta.lastBackupAt = store.state.meta.lastBackupAt;
           next.profile.onboarded = true;
           store.replace(next);
-          toast(`Wiederhergestellt: ${sm.sessions} Einheiten`);
         } else {
-          const { state, added, updated } = mergeStates(store.state, parsed.state);
+          const { state } = mergeStates(store.state, parsed.state);
           state.draft = store.state.draft;
+          state.photos = { ...store.state.photos };
           store.replace(state);
-          toast(`Zusammengeführt: ${added} neu, ${updated} aktualisiert`);
         }
+        const written = await restorePhotos(parsed.photos, replace);
         close(true);
+        toast(replace
+          ? `Wiederhergestellt: ${sm.sessions} Einheiten${written ? `, ${written} Fotos` : ''}`
+          : `Zusammengeführt${written ? ` (+${written} Fotos)` : ''}`);
         rerender();
       }));
     },
   });
+}
+
+/** Fotos aus einer Sicherung zurückschreiben. Ersetzen: alle; Zusammenführen: nur fehlende. */
+async function restorePhotos(photos, replace) {
+  const entries = Object.entries(photos || {});
+  if (replace) await store.clearPhotos().catch(() => {});
+  if (!entries.length || !store.photosSupported) return 0;
+  const now = new Date().toISOString();
+  const added = {};
+  for (const [key, url] of entries) {
+    if (!replace && store.state.photos[key]) continue;
+    try {
+      const blob = dataURLToBlob(url);
+      if (!blob) continue;
+      await store.putPhoto(key, blob);
+      added[key] = now;
+    } catch { /* einzelnes Foto überspringen */ }
+  }
+  store.update((s) => { s.photos = { ...(replace ? {} : s.photos), ...added }; }, { now: true });
+  return Object.keys(added).length;
 }
 
 export function filePicker(onFile) {

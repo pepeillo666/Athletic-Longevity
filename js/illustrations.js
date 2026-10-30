@@ -52,6 +52,24 @@ function figure(p, { ghost = false, accent = [] } = {}) {
 }
 
 const padLine = (a, b) => line(a, b, 'ill-pad');
+
+/** Gewichtsblock: Gehäuse, Führungsstangen, Platten und Steckstift. */
+function weightStack(x, top, bottom, w = 24) {
+  const n = 7;
+  const ph = 5.2;
+  const gap = 1.8;
+  const plateTop = bottom - 8 - n * (ph + gap);
+  let plates = '';
+  for (let i = 0; i < n; i++) plates += rect(x + 4, r1(plateTop + i * (ph + gap)), w - 8, ph, 1.5, 'ill-plate');
+  const pinY = plateTop + 3 * (ph + gap) + ph / 2;
+  return `<g class="ill-stack">
+    ${rect(x, top, w, bottom - top, 4, 'ill-frame')}
+    ${line([x + 5, top + 6], [x + 5, bottom - 6], 'ill-rod')}${line([x + w - 5, top + 6], [x + w - 5, bottom - 6], 'ill-rod')}
+    ${line([x + w / 2, top + 8], [x + w / 2, plateTop], 'ill-cable')}
+    ${plates}
+    ${line([x + w - 3, pinY], [x + w + 6, pinY], 'ill-pin')}
+  </g>`;
+}
 const mach = (a, b) => line(a, b, 'ill-mach');
 const thin = (a, b) => line(a, b, 'ill-thin');
 const ground = '<line x1="14" y1="146" x2="226" y2="146" class="ill-ground"/>';
@@ -65,6 +83,7 @@ const SCENES = {
     const shoulder = [60, 64];
     const top = { head: [54, 48.5], shoulder, hip, arms: [[shoulder, [70, 86], [84, 104]]] };
     return `<g transform="translate(18 0)">
+      ${weightStack(4, 44, 138, 22)}
       ${line([30, 138], [196, 138], 'ill-thin')}
       ${padLine([58, 112], [45, 60])}${padLine([62, 117], [100, 117])}
       ${mach([82, 120], [82, 138])}
@@ -83,10 +102,10 @@ const SCENES = {
     const base = { head: [77, 48], shoulder, hip, legs: [[hip, [114, 112], [114, 142]]] };
     return `<g transform="translate(6 0)">
       ${padLine([66, 58], [66, 112])}${padLine([68, 117], [104, 117])}${mach([86, 120], [86, 142])}
-      ${mach([176, 28], [176, 142])}
-      <g class="ill-ghost">${thin([176, 34], [104, 72])}${line([104, 64], [104, 80], 'ill-grip')}</g>
+      ${weightStack(166, 24, 142, 24)}
+      <g class="ill-ghost">${thin([178, 32], [104, 72])}${line([104, 64], [104, 80], 'ill-grip')}</g>
       ${figure({ ...base, arms: [[shoulder, [84, 88], [104, 72]]] }, { ghost: true })}
-      ${thin([176, 34], [128, 70])}${line([128, 62], [128, 78], 'ill-grip')}
+      ${thin([178, 32], [128, 70])}${line([128, 62], [128, 78], 'ill-grip')}
       ${figure({ ...base, arms: [[shoulder, [103, 68], [128, 70]]] }, { accent: ['arm0'] })}
       ${arrow([108, 46], [138, 46])}
     </g>`;
@@ -99,10 +118,10 @@ const SCENES = {
     return `<g transform="translate(4 0)">
       ${padLine([52, 119], [100, 119])}${mach([76, 122], [76, 142])}
       ${padLine([143, 100], [143, 130])}
-      ${mach([204, 40], [204, 142])}${circle([199, 100], 5, 'ill-pulley')}
-      <g class="ill-ghost">${line([122, 78], [199, 100], 'ill-cable')}</g>
+      ${weightStack(200, 30, 142, 24)}${circle([197, 100], 5, 'ill-pulley')}
+      <g class="ill-ghost">${line([122, 78], [197, 100], 'ill-cable')}</g>
       ${figure({ ...base, arms: [[shoulder, [98, 72], [122, 78]]] }, { ghost: true })}
-      ${line([80, 90], [199, 100], 'ill-cable')}
+      ${line([80, 90], [197, 100], 'ill-cable')}
       ${figure({ ...base, arms: [[shoulder, [54, 82], [78, 90]]] }, { accent: ['arm0'] })}
       ${arrow([124, 50], [94, 50])}
     </g>`;
@@ -114,6 +133,7 @@ const SCENES = {
     const shoulder = [70, 58];
     const base = { head: [67, 42], shoulder, hip, arms: [[shoulder, [78, 82], [92, 98]]] };
     return `<g transform="translate(6 0)">
+      ${weightStack(22, 44, 142, 22)}
       ${padLine([59, 52], [64, 100])}${padLine([66, 109], [110, 109])}${mach([90, 112], [90, 142])}
       ${padLine([90, 92], [114, 92])}
       <g class="ill-ghost">${thin(knee, [147, 107])}${circle([147, 107], 6, 'ill-roller')}</g>
@@ -159,6 +179,7 @@ const SCENES = {
     const shoulder = [70, 58];
     const base = { head: [67, 42], shoulder, hip, arms: [[shoulder, [78, 82], [92, 98]]] };
     return `<g transform="translate(6 0)">
+      ${weightStack(22, 44, 142, 22)}
       ${padLine([59, 52], [64, 100])}${padLine([66, 109], [110, 109])}${mach([90, 112], [90, 142])}
       <g class="ill-ghost">${thin(knee, [126, 129])}${circle([126, 129], 6, 'ill-roller')}</g>
       ${figure({ ...base, legs: [[hip, knee, [118, 136]]] }, { ghost: true })}
@@ -174,12 +195,12 @@ const SCENES = {
     const shoulder = [77, 63];
     const base = { head: [74, 47], shoulder, hip, legs: [[hip, [114, 104], [116, 142]]] };
     return `<g transform="translate(14 0)">
-      ${mach([180, 14], [180, 142])}${mach([180, 14], [110, 14])}${circle([110, 19], 5, 'ill-pulley')}
+      ${weightStack(172, 12, 142, 24)}${mach([172, 16], [110, 16])}${circle([110, 21], 5, 'ill-pulley')}
       ${padLine([62, 113], [104, 113])}${mach([84, 116], [84, 142])}
       ${padLine([100, 95], [120, 95])}
-      <g class="ill-ghost">${line([102, 22], [110, 19], 'ill-cable')}${circle([102, 22], 4.5, 'ill-weight')}</g>
+      <g class="ill-ghost">${line([102, 22], [110, 21], 'ill-cable')}${circle([102, 22], 4.5, 'ill-weight')}</g>
       ${figure({ ...base, arms: [[shoulder, [90, 42], [102, 22]]] }, { ghost: true })}
-      ${line([96, 70], [110, 19], 'ill-cable')}
+      ${line([96, 70], [110, 21], 'ill-cable')}
       ${figure({ ...base, arms: [[shoulder, [72, 87], [96, 70]]] }, { accent: ['arm0'] })}
       ${circle([96, 70], 4.5, 'ill-weight')}
       ${arrow([128, 26], [128, 60])}
@@ -223,10 +244,10 @@ const SCENES = {
       legs: [[hip, [116, 118], [116, 142]]], farLegs: [[hip, [104, 118], [99, 142]]],
     };
     return `<g transform="translate(-6 0)">
-      ${mach([178, 14], [178, 142])}${circle([173, 22], 5, 'ill-pulley')}
-      <g class="ill-ghost">${line([134, 66], [173, 22], 'ill-cable')}</g>
+      ${weightStack(176, 12, 142, 24)}${circle([173, 24], 5, 'ill-pulley')}
+      <g class="ill-ghost">${line([134, 66], [173, 24], 'ill-cable')}</g>
       ${figure({ ...base, arms: [[shoulder, [110, 72], [134, 66]]] }, { ghost: true })}
-      ${line([116, 96], [173, 22], 'ill-cable')}
+      ${line([116, 96], [173, 24], 'ill-cable')}
       ${figure({ ...base, arms: [[shoulder, [110, 72], [116, 96]]] }, { accent: ['arm0:1'] })}
       ${curve([144, 70], [150, 94], [128, 106])}
     </g>`;
@@ -240,7 +261,7 @@ const SCENES = {
       legs: [[hip, [116, 118], [116, 142]]], farLegs: [[hip, [104, 118], [99, 142]]],
     };
     return `<g transform="translate(-6 0)">
-      ${mach([178, 14], [178, 142])}${circle([173, 132], 5, 'ill-pulley')}
+      ${weightStack(176, 12, 142, 24)}${circle([173, 132], 5, 'ill-pulley')}
       <g class="ill-ghost">${line([118, 96], [173, 132], 'ill-cable')}</g>
       ${figure({ ...base, arms: [[shoulder, [112, 72], [118, 96]]] }, { ghost: true })}
       ${line([130, 56], [173, 132], 'ill-cable')}

@@ -2,7 +2,7 @@
 
 Persönliche Fitness-App (Progressive Web App) für einen vorsichtigen Wiedereinstieg ins Krafttraining: ein 12-Wochen-Plan mit zwei Ganzkörpereinheiten im Wechsel, Trainingsprotokoll, Fortschrittsdiagrammen und Datensicherung. Die App läuft komplett im Browser, funktioniert nach dem ersten Laden offline und braucht weder Konto noch Server.
 
-**Adresse:** https://pepeillo666.github.io/athletic-longevity/
+**Adresse:** https://pepeillo666.github.io/Athletic-Longevity/ (nach Umbenennen des Repositorys in `athletic-longevity`: https://pepeillo666.github.io/athletic-longevity/)
 
 > **Wichtig:** Athletic Longevity ersetzt keine ärztliche Untersuchung, Beratung oder Trainingsfreigabe. Trainiere erst nach individueller Freigabe durch Kardiologie bzw. die betreuende Ärztin oder den betreuenden Arzt und halte dich an die dort festgelegten Belastungsgrenzen. Der Plan ist allgemein gehalten – zeig ihn deiner Ärztin oder deinem Arzt und lass die Freigabe erneuern, wenn sich Beschwerden, Medikamente oder dein Gesundheitszustand ändern. Bei Brustschmerzen, ungewöhnlicher Atemnot, Schwindel oder anderen Warnzeichen das Training sofort beenden – im Zweifel Notruf 112.
 
@@ -12,7 +12,8 @@ Persönliche Fitness-App (Progressive Web App) für einen vorsichtigen Wiederein
 
 - **Heute:** aktuelle Trainingswoche (12-Segment-Ring), nächste Einheit mit Vorgaben, absolvierte Einheiten, Fortschritt in Prozent, letztes Training, Erholungs- und Motivationshinweise.
 - **Plan:** fünf Phasen mit Sätzen, Wiederholungen, Belastung (RPE), Pausen und Ausdauer; Training A und B mit Anleitungen; Woche wiederholen.
-- **Training:** Vorab-Check, Aufwärmen, optionale Ausdauer und Abwärmen mit Timer, jede Übung mit selbst gezeichneter Illustration, Schritt-für-Schritt-Anleitung, Eingabe von Gewicht, Wiederholungen und RPE pro Satz, Sätze und Übungen abhaken, Notizen, Pausen-Timer, Warnzeichen-Knopf mit Notruf und Abbruch.
+- **Gerätefotos:** Zu jedem Gerät ein eigenes Foto aus deinem Studio aufnehmen oder aus der Fotomediathek wählen – es erscheint in der Übungsanleitung, im Training und im Plan. Dazu eine dauerhafte „Einstellung am Gerät“ (z. B. Sitz 4, Rückenlehne 2). Fotos werden verkleinert und nur auf dem Gerät gespeichert.
+- **Training:** Vorab-Check, Aufwärmen, optionale Ausdauer und Abwärmen mit Timer, jede Übung mit selbst gezeichneter Illustration (Geräte mit Gewichtsblock), Schritt-für-Schritt-Anleitung, Eingabe von Gewicht, Wiederholungen und RPE pro Satz, Sätze und Übungen abhaken, Notizen, Pausen-Timer, Warnzeichen-Knopf mit Notruf und Abbruch.
 - **Sicherheit im Training:** Steuerung über RPE und Sprechtest statt Puls (Betablocker), Hinweis bei zu hoher Belastung, ärztliche Obergrenzen werden berücksichtigt, Gewichte werden **nie automatisch** erhöht.
 - **Verlauf:** alle Einheiten mit Datum, Training A/B, Übungen, Gewicht, Wiederholungen, Sätzen, RPE, Dauer und Wohlbefinden; bearbeiten, löschen, nachtragen.
 - **Fortschritt:** Trainingshäufigkeit, abgeschlossene Wochen, Konstanz-Kalender, Gewichts- und Wiederholungsverlauf je Übung, Belastungsverlauf, optional Körpergewicht – ohne Prognosen.
@@ -33,7 +34,7 @@ Persönliche Fitness-App (Progressive Web App) für einen vorsichtigen Wiederein
 
 Das Repository war bei der Prüfung leer – es wurde also nichts überschrieben.
 
-> **Adresse und Repository-Name:** GitHub-Pages-Adressen unterscheiden Groß- und Kleinschreibung und richten sich nach dem Repository-Namen. Heißt das Repository `Athletic-Longevity`, lautet die Adresse `https://pepeillo666.github.io/Athletic-Longevity/`. Für die Adresse `https://pepeillo666.github.io/athletic-longevity/` das Repository unter **Settings → General → Repository name** in `athletic-longevity` umbenennen. Die App funktioniert unter beiden Adressen, weil alle Pfade relativ sind – Trainingsdaten gehören aber immer zur jeweiligen Adresse.
+> **Adresse und Repository-Name:** GitHub-Pages-Adressen unterscheiden Groß- und Kleinschreibung und richten sich nach dem Repository-Namen. Heißt das Repository `Athletic-Longevity`, lautet die Adresse `https://pepeillo666.github.io/Athletic-Longevity/`. Für die Adresse `https://pepeillo666.github.io/athletic-longevity/` das Repository unter **Settings → General → Repository name** in `athletic-longevity` umbenennen. Die App funktioniert unter beiden Adressen, weil alle Pfade relativ sind. Ist sie bereits auf dem Home-Bildschirm installiert, vor dem Umbenennen eine Sicherung erstellen, danach die App unter der neuen Adresse neu hinzufügen und die Sicherung wiederherstellen.
 
 ### Variante A: Über die GitHub-Website (am einfachsten)
 
@@ -76,6 +77,7 @@ Danach GitHub Pages wie in Schritt 6 oben aktivieren.
 
 - **Einstellungen → Datensicherung → Sicherung erstellen** öffnet das Teilen-Menü des iPhones. Dort „In Dateien sichern“ wählen oder die Datei per Mail an dich selbst senden.
 - Daten können verloren gehen, wenn Websitedaten gelöscht werden oder die App vom Home-Bildschirm entfernt wird. Deshalb erinnert die App alle zwei Wochen an eine Sicherung.
+- Die Sicherung enthält auch deine Gerätefotos und Geräteeinstellungen.
 - **Wiederherstellen:** Einstellungen → „Sicherung wiederherstellen“ (oder beim ersten Start auf dem Willkommensbildschirm) und die `.json`-Datei auswählen. „Ersetzen“ übernimmt die Sicherung vollständig, „Zusammenführen“ ergänzt nur fehlende Einheiten.
 - **CSV-Export** (Semikolon, Dezimalkomma) für Excel oder Numbers.
 
@@ -102,6 +104,7 @@ athletic-longevity/
     ├── plan.js             12-Wochen-Logik, Wochenberechnung, Statistiken
     ├── exercises.js        Übungskatalog mit Anleitungen
     ├── illustrations.js    selbst gezeichnete SVG-Illustrationen
+    ├── photos.js           eigene Gerätefotos (verkleinern, lokal speichern, anzeigen)
     ├── content.js          Sicherheits- und Hinweistexte
     ├── store.js            Speicherung (IndexedDB + Spiegel), Bereinigung
     ├── backup.js           JSON-/CSV-Export, Import
@@ -114,27 +117,39 @@ athletic-longevity/
 - Navigation über `#/…`-Adressen – dadurch keine 404-Fehler auf GitHub Pages.
 - **Wochenberechnung:** Eine Planwoche dauert 7 Tage ab dem Startdatum. „Woche wiederholen“, „Woche festlegen“ und der Wiedereinstieg nach einer Pause setzen sogenannte Anker; jede Einheit speichert ihre Planwoche, sodass spätere Änderungen den Verlauf nicht verfälschen. Datumsrechnung sommerzeitsicher.
 
-## Testbericht (Version 1.0.0)
+## Weg zur echten iOS-App
 
-**Automatisch getestet** (Chromium mit iPhone-Emulation, App unter dem Unterpfad `/athletic-longevity/` ausgeliefert):
+1. **Jetzt:** die Web-App weiterentwickeln. Code, Daten und Sicherungen lassen sich später vollständig übernehmen.
+2. **Dann:** dieselbe App mit [Capacitor](https://capacitorjs.com) in eine echte iOS-App verpacken (Xcode auf dem iMac). Damit werden native Funktionen möglich, z. B. eine Mitteilung am Pausenende auch bei gesperrtem Bildschirm, eine Anbindung an Apple Health und dauerhafter App-Speicher.
+3. **Datenübernahme:** in der Web-App eine Sicherung erstellen und in der iOS-App wiederherstellen (inklusive Fotos).
+4. **Kosten:** Zum Ausprobieren reicht eine kostenlose Apple-ID; selbst installierte Apps laufen dann jeweils 7 Tage und werden danach neu aus Xcode aufgespielt. Für dauerhafte Nutzung, TestFlight oder den App Store ist das Apple-Developer-Programm nötig (in der EU 99 € pro Jahr).
+5. **Alternative:** eine komplette Neuentwicklung in Swift/SwiftUI – am nativsten, aber deutlich mehr Aufwand.
+
+## Testbericht (Version 1.1.0)
+
+**Automatisch getestet** (Chromium mit iPhone-Emulation, App unter dem Unterpfad ausgeliefert):
 
 | Prüfpunkt | Ergebnis |
 |---|---|
 | Navigation auf kleinen Bildschirmen (320, 375, 390, 430 px; alle Ansichten, Hell und Dunkel) | kein horizontales Scrollen, nichts abgeschnitten |
 | Daten nach Neuladen wiederhergestellt (auch mitten im Training: Gewichte, Notizen, erledigte Sätze) | bestanden |
 | Datensicherung (JSON), CSV-Export, Zurücksetzen und Wiederherstellen | bestanden |
-| Wochenberechnung (71 Logik-Tests: Wochenwechsel, Zeitumstellung, Wiederholen, Pausen, Statistik, Import/Export) | 71/71 bestanden |
+| Logik-Tests (Wochenwechsel, Zeitumstellung, Wiederholen, Pausen, Statistik, Import/Export, Fotos) | 80/80 bestanden |
 | Übungen, Sätze, Fortschritt und Diagramme korrekt angezeigt | bestanden |
+| Gerätefotos (19 Prüfungen: aufnehmen, Verkleinerung auf 1400 px, Neuladen, Plan, Training, gemeinsames Foto für „Brustpresse leicht“, Sicherung, Reset, Wiederherstellung, Löschen, offline) | 19/19 bestanden |
+| Update von Version 1.0.0 auf 1.1.0 mit vorhandenen Trainingsdaten | Daten erhalten, Datenbank erweitert, alter Offline-Speicher entfernt |
 | Manifest und Service Worker unter dem Unterpfad | bestanden, alle Icons erreichbar |
 | Offline-Nutzung nach dem ersten Laden (Neuladen ohne Netz, alle Tabs) | bestanden |
+| Barrierefreiheit (axe, WCAG 2 AA, alle Ansichten hell und dunkel) | keine Verstöße |
 | JavaScript-Fehler oder fehlende Dateien | keine |
-| Ende-zu-Ende-Ablauf (40 Prüfungen: Willkommen → Training → Verlauf → Fortschritt → Sicherung → Reset → Wiederherstellung → Offline) | 40/40 bestanden |
+| Ende-zu-Ende-Ablauf (40 Prüfungen) und Bedienabläufe (20 Prüfungen) | 60/60 bestanden |
 
 **Noch auf einem echten iPhone zu prüfen** (in der Testumgebung nicht verfügbar):
 
 - „Zum Home-Bildschirm“ in Safari und Start als eigenständige App
 - Offline-Start der installierten App (einmal online öffnen, dann Flugmodus)
 - Teilen-Menü beim Erstellen der Sicherung und Dateiauswahl beim Wiederherstellen
+- Kamera bzw. Fotomediathek beim Hinzufügen eines Gerätefotos
 - Darstellung der Statusleiste, Notch/Dynamic Island und Home-Indikator
 - Schrift SF Pro Rounded, Datums- und Auswahlfelder von iOS
 - Signalton am Pausenende und „Bildschirm anlassen“ (abhängig von iOS-Version und Lautlos-Schalter)

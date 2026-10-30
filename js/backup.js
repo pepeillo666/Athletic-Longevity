@@ -1,14 +1,15 @@
 // Datensicherung: Export als JSON und CSV, Import aus einer Sicherung.
 import { todayISO, formatDate } from './util.js';
-import { migrate, cleanSession } from './store.js';
+import { migrate, cleanSession, MACHINE_KEYS } from './store.js';
 import { exerciseName } from './exercises.js';
 import { sortSessionsDesc } from './plan.js';
 
 export const APP_ID = 'athletic-longevity';
 export const BACKUP_FORMAT = 1;
 
-export function buildBackup(state, appVersion) {
-  return {
+/** photos: Map Gerät → Data-URL (optional) */
+export function buildBackup(state, appVersion, photos = null) {
+  const out = {
     app: APP_ID,
     format: BACKUP_FORMAT,
     appVersion,
@@ -21,12 +22,15 @@ export function buildBackup(state, appVersion) {
       settings: state.settings,
       sessions: state.sessions,
       bodyWeights: state.bodyWeights,
+      machineNotes: state.machineNotes,
     },
   };
+  if (photos && photos.size) out.photos = Object.fromEntries(photos);
+  return out;
 }
 
-export function backupFile(state, appVersion) {
-  const json = JSON.stringify(buildBackup(state, appVersion), null, 2);
+export function backupFile(state, appVersion, photos = null) {
+  const json = JSON.stringify(buildBackup(state, appVersion, photos), null, 2);
   return new File([json], `athletic-longevity-sicherung-${todayISO()}.json`, { type: 'application/json' });
 }
 
@@ -142,16 +146,24 @@ export function parseBackup(text) {
   if (obj.format && obj.format > BACKUP_FORMAT) {
     return { ok: false, error: 'Diese Sicherung stammt aus einer neueren App-Version. Bitte aktualisiere die App zuerst.' };
   }
-  const state = migrate({ ...data, draft: null });
+  const state = migrate({ ...data, photos: {}, draft: null });
+  const photos = {};
+  if (obj.photos && typeof obj.photos === 'object' && !Array.isArray(obj.photos)) {
+    for (const [k, v] of Object.entries(obj.photos)) {
+      if (MACHINE_KEYS.includes(k) && typeof v === 'string' && /^data:image\/(jpeg|png|webp);base64,/.test(v) && v.length < 8000000) photos[k] = v;
+    }
+  }
   const sessions = state.sessions.length;
   const dates = state.sessions.map((s) => s.date).sort();
   return {
     ok: true,
     state,
+    photos,
     summary: {
       exportedAt: obj.exportedAt || null,
       sessions,
       bodyWeights: state.bodyWeights.length,
+      photos: Object.keys(photos).length,
       first: dates[0] || null,
       last: dates[dates.length - 1] || null,
     },
@@ -178,5 +190,6 @@ export function mergeStates(current, incoming) {
     if (!weights.has(w.id) && !dates.has(w.date)) { weights.set(w.id, w); dates.add(w.date); }
   }
   merged.bodyWeights = [...weights.values()];
+  for (const [k, v] of Object.entries(incoming.machineNotes || {})) if (!merged.machineNotes[k]) merged.machineNotes[k] = v;
   return { state: merged, added, updated };
 }
