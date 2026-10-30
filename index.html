@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="de" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Athletic Longevity</title>
+  <meta name="description" content="12-Wochen-Beispielplan für einen vorsichtigen Wiedereinstieg ins Krafttraining – nur nach ärztlicher Freigabe. Offline nutzbar, ohne Konto, alle Daten bleiben auf dem Gerät.">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#111316">
+  <meta name="color-scheme" content="dark light">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Longevity">
+  <meta name="format-detection" content="telephone=no">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icons/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="icon" href="./icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="./css/app.css">
+  <script>
+    // Farbschema sofort setzen, damit beim Start nichts aufblitzt.
+    (function () {
+      try {
+        var t = localStorage.getItem('al-theme') || 'dark';
+        var dark = t === 'dark' || (t === 'system' && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+      } catch (e) { /* Standard: dunkel */ }
+    })();
+  </script>
+</head>
+<body>
+  <div class="statusbar-scrim" aria-hidden="true"></div>
+
+  <main id="view" class="view" tabindex="-1">
+    <div class="boot" aria-hidden="true">
+      <svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="44" fill="none" stroke="#2f343a" stroke-width="9"/><circle cx="60" cy="60" r="44" fill="none" stroke="#3ccf91" stroke-width="9" stroke-linecap="round" stroke-dasharray="220 277" transform="rotate(-90 60 60)"/><path d="M43 76 60 42l17 34" fill="none" stroke="#f1f3f2" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M50 65h20" stroke="#3ccf91" stroke-width="8" stroke-linecap="round"/></svg>
+    </div>
+  </main>
+
+  <a id="live-pill" class="live-pill" href="#/training" hidden>
+    <span class="live-pulse" aria-hidden="true"></span>
+    <span data-live-text>Training läuft</span>
+    <span class="live-time" data-live-time>0:00</span>
+  </a>
+
+  <div id="timer-root" class="timer-root"></div>
+
+  <nav class="tabbar" aria-label="Hauptnavigation">
+    <a class="tab" data-tab="heute" href="#/heute">
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10.5 12 4l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5.5h-5V20H5a1 1 0 0 1-1-1z"/></svg>
+      <span>Heute</span>
+    </a>
+    <a class="tab" data-tab="plan" href="#/plan">
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M3.5 10h17M8.5 3v4M15.5 3v4"/></svg>
+      <span>Plan</span>
+    </a>
+    <a class="tab" data-tab="training" href="#/training">
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 7v10M17.5 7v10M3.5 9.5v5M20.5 9.5v5M6.5 12h11"/></svg>
+      <span>Training</span>
+    </a>
+    <a class="tab" data-tab="verlauf" href="#/verlauf">
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.3 13a8 8 0 1 0 2.1-6.7"/><path d="M4 4.5V8.5h4"/><path d="M12 8v4.2l3 1.8"/></svg>
+      <span>Verlauf</span>
+    </a>
+    <a class="tab" data-tab="fortschritt" href="#/fortschritt">
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20v-6M12 20V6M19 20v-10"/></svg>
+      <span>Fortschritt</span>
+    </a>
+  </nav>
+
+  <div id="sheet-root"></div>
+  <div id="toast-root" class="toast-root"></div>
+
+  <noscript><p class="noscript">Athletic Longevity benötigt JavaScript. Bitte aktiviere JavaScript in den Safari-Einstellungen.</p></noscript>
+  <script type="module" src="./js/app.js"></script>
+</body>
+</html>
