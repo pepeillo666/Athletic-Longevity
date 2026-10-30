@@ -31,7 +31,9 @@ Persönliche Fitness-App (Progressive Web App) für einen vorsichtigen Wiederein
 
 ## Veröffentlichung auf GitHub Pages
 
-Das Repository `Pepeillo666/athletic-longevity` war bei der Prüfung leer – es wird also nichts überschrieben.
+Das Repository war bei der Prüfung leer – es wurde also nichts überschrieben.
+
+> **Adresse und Repository-Name:** GitHub-Pages-Adressen unterscheiden Groß- und Kleinschreibung und richten sich nach dem Repository-Namen. Heißt das Repository `Athletic-Longevity`, lautet die Adresse `https://pepeillo666.github.io/Athletic-Longevity/`. Für die Adresse `https://pepeillo666.github.io/athletic-longevity/` das Repository unter **Settings → General → Repository name** in `athletic-longevity` umbenennen. Die App funktioniert unter beiden Adressen, weil alle Pfade relativ sind – Trainingsdaten gehören aber immer zur jeweiligen Adresse.
 
 ### Variante A: Über die GitHub-Website (am einfachsten)
 
